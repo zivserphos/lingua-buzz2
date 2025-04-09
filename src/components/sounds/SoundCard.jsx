@@ -1,0 +1,136 @@
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Clock, Flame, Sparkles, Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import LeaderboardModal from "./LeaderboardModal";
+
+export default function SoundCard({ sound }) {
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  const soundUrl = createPageUrl("MemeSound", { name: sound.id });
+  
+  // The state object carries additional data that won't be in the URL
+  const soundState = { 
+    soundName: sound.name,
+    soundId: sound.id
+  };
+  
+  // Mock leaderboard data
+  const leaderboardStats = [
+    {
+      user_email: "meme.master@example.com",
+      listen_time: 7200,
+      crazy_mode_count: 42
+    },
+    {
+      user_email: "sound.lover@example.com",
+      listen_time: 3600,
+      crazy_mode_count: 25
+    },
+    {
+      user_email: "viral.king@example.com",
+      listen_time: 1800,
+      crazy_mode_count: 15
+    }
+  ];
+
+  const handleLeaderboardClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowLeaderboard(true);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+      whileHover={{ y: -5 }}
+      className="group relative"
+    >
+      <Card className="overflow-hidden bg-white/70 backdrop-blur-sm hover:bg-white/90 transition-all duration-300">
+        <CardContent className="p-0">
+          <div className="relative">
+            <img 
+              src={sound.image_url}
+              alt={sound.name}
+              className="w-full h-48 object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+        <Link 
+          to={soundUrl}
+          state={soundState}
+          className="inline-flex"
+        >
+                <Button
+                  className="bg-purple-600 hover:bg-purple-700"
+                  size="sm"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Go Crazy
+                </Button>
+              </Link>
+            </div>
+          </div>
+          
+          <div className="p-4 space-y-3">
+            <div className="flex justify-between items-start">
+              <h3 className="font-semibold text-lg leading-tight">{sound.name}</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-yellow-500 hover:text-yellow-600"
+                onClick={handleLeaderboardClick}
+              >
+                <Trophy className="w-4 h-4" />
+              </Button>
+            </div>
+            
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <div className="flex items-center gap-1">
+                <Flame className="w-4 h-4 text-orange-500" />
+                <span>{sound.virality_index}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Clock className="w-4 h-4 text-blue-500" />
+                <span>{sound.length}s</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {sound.hastags?.slice(0, 3).map((tag, i) => (
+                <Badge 
+                  key={i}
+                  variant="secondary" 
+                  className="bg-purple-100 text-purple-700 hover:bg-purple-200"
+                >
+                  #{tag}
+                </Badge>
+              ))}
+            </div>
+
+            <audio 
+              controls 
+              className="w-full mt-3" 
+              preload="none"
+            >
+              <source src={sound.audio_url} type="audio/mpeg" />
+            </audio>
+          </div>
+        </CardContent>
+      </Card>
+      
+      <LeaderboardModal
+        isOpen={showLeaderboard}
+        onClose={() => setShowLeaderboard(false)}
+        stats={leaderboardStats}
+        soundName={sound.name}
+      />
+    </motion.div>
+  );
+}
