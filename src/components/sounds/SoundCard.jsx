@@ -1,25 +1,27 @@
+
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Flame, Sparkles, Trophy } from "lucide-react";
+import { Clock, Flame, Sparkles, Trophy, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import LeaderboardModal from "./LeaderboardModal";
+import SocialService from "@/components/services/SocialService";
 
 export default function SoundCard({ sound }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [isLiked, setIsLiked] = useState(sound?.isLiked || false);
+  const [likeCount, setLikeCount] = useState(sound?.num_of_likes || 0);
+  const [loading, setLoading] = useState(false);
 
   const soundUrl = createPageUrl("MemeSound", { name: sound.id });
-  
-  // The state object carries additional data that won't be in the URL
   const soundState = { 
     soundName: sound.name,
     soundId: sound.id
   };
-  
-  // Mock leaderboard data
+
   const leaderboardStats = [
     {
       user_email: "meme.master@example.com",
@@ -38,10 +40,27 @@ export default function SoundCard({ sound }) {
     }
   ];
 
-  const handleLeaderboardClick = (e) => {
+  const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    setShowLeaderboard(true);
+    
+    try {
+      setLoading(true);
+      setIsLiked(!isLiked);
+      setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+
+      if (isLiked) {
+        await SocialService.unlikeSound(sound.id);
+      } else {
+        await SocialService.likeSound(sound.id);
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      setIsLiked(!isLiked);
+      setLikeCount(prev => isLiked ? prev + 1 : prev - 1);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -81,14 +100,30 @@ export default function SoundCard({ sound }) {
           <div className="p-4 space-y-3">
             <div className="flex justify-between items-start">
               <h3 className="font-semibold text-lg leading-tight">{sound.name}</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-yellow-500 hover:text-yellow-600"
-                onClick={handleLeaderboardClick}
-              >
-                <Trophy className="w-4 h-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`text-pink-500 hover:text-pink-600 ${isLiked ? 'bg-pink-50' : ''}`}
+                  onClick={handleLike}
+                  disabled={loading}
+                >
+                  <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                  <span className="ml-1">{likeCount}</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-yellow-500 hover:text-yellow-600"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setShowLeaderboard(true);
+                  }}
+                >
+                  <Trophy className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
             
             <div className="flex items-center gap-3 text-sm text-gray-600">

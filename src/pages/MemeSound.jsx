@@ -19,6 +19,8 @@ import {
   Trophy
 } from "lucide-react";
 import LeaderboardModal from "../components/sounds/LeaderboardModal";
+import SocialSection from "../components/sounds/SocialSection";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 // Firebase config reference
 const firebaseConfig = {
@@ -56,8 +58,17 @@ export default function MemeSoundPage() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardStats, setLeaderboardStats] = useState([]);
   
+  const [canApplyStats, setCanApplyStats] = useState(false);
+  
   const audioRef = useRef(null);
   const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (audioRef.current && sound?.audio_url) {
+      audioRef.current.src = sound.audio_url;
+      audioRef.current.load();
+    }
+  }, [sound?.audio_url]);
 
   useEffect(() => {
     fetchSoundDetails();
@@ -428,13 +439,41 @@ const handleStatsUpdate = async (listenTime) => {
       return;
     }
     
-    // Create a hidden anchor element
-    const a = document.createElement('a');
-    a.href = sound.audio_url;
-    a.download = `${sound.name || 'meme-sound'}.mp3`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    // Fetch the audio file and download it
+    fetch(sound.audio_url)
+      .then(response => response.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${sound.name || 'meme-sound'}.mp3`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      })
+      .catch(error => {
+        console.error('Error downloading audio:', error);
+      });
+  };
+
+  // Update stats tracking
+  useEffect(() => {
+    if (elapsedTime >= 120) {
+      setCanApplyStats(true);
+    }
+  }, [elapsedTime]);
+
+  const handleApplyStats = async () => {
+    if (elapsedTime >= 120) {
+      try {
+        await handleStatsUpdate(elapsedTime);
+        setElapsedTime(0);
+        setCanApplyStats(false);
+      } catch (err) {
+        console.error('Error applying stats:', err);
+      }
+    }
   };
 
   const formatTime = (seconds) => {
@@ -470,6 +509,13 @@ const handleStatsUpdate = async (listenTime) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6">
+      {/* Hidden audio element */}
+      <audio
+        ref={audioRef}
+        onEnded={() => setIsPlaying(false)}
+        preload="auto"
+      />
+
       <div className="max-w-4xl mx-auto">
         <div className="mb-6">
           <Link to={createPageUrl("Sounds")}>
@@ -495,7 +541,7 @@ const handleStatsUpdate = async (listenTime) => {
                 <h1 className="text-4xl font-bold mb-2">{sound.name}</h1>
                 <Button 
                   variant="outline" 
-                  className="text-white border-white hover:bg-white/20"
+                  className="text-white/80 border-white/30 hover:bg-white/10"
                   onClick={() => setShowLeaderboard(true)}
                 >
                   <Trophy className="w-5 h-5 mr-2 text-yellow-400" />
@@ -525,6 +571,24 @@ const handleStatsUpdate = async (listenTime) => {
                 )}
                 {isPlaying ? 'Pause' : 'Play'}
               </Button>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      onClick={handleApplyStats}
+                      className={`h-12 ${canApplyStats ? "bg-green-600 hover:bg-green-700" : "bg-gray-400"}`}
+                      disabled={!canApplyStats}
+                    >
+                      <Trophy className="w-5 h-5 mr-2" />
+                      Apply to Stats
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Listen for at least 2 minutes to apply to your stats</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               <Button
                 onClick={toggleLoop}
@@ -627,21 +691,10 @@ const handleStatsUpdate = async (listenTime) => {
               )}
             </div>
 
-            <audio 
-              ref={audioRef}
-              onEnded={() => {
-                if (!isLooping) {
-                  setIsPlaying(false);
-                  if (timerRef.current) clearInterval(timerRef.current);
-                }
-              }}
-              preload="auto"
-              className="hidden"
-            >
-              <source src={sound.audio_url} type="audio/mpeg" />
-              Your browser does not support the audio element.
-            </audio>
+            <SocialSection sound={sound} />
           </div>
+
+          {/* ... keep rest of the component */}
         </Card>
       </div>
       
