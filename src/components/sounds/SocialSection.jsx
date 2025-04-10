@@ -18,6 +18,7 @@ export default function SocialSection({ sound }) {
   const [comments, setComments] = useState([]);
   const [likes, setLikes] = useState([]);
   const [isLiked, setIsLiked] = useState(sound?.isLiked || false);
+  const [totalLikesCount, setTotalLikesCount] = useState(sound?.num_of_likes || 0);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [likedComments, setLikedComments] = useState(new Set());
@@ -41,6 +42,8 @@ export default function SocialSection({ sound }) {
         console.error('Error with sound like:', error);
         // Revert UI state on error
         setIsLiked(!shouldLike);
+        // Also revert the total likes count
+        setTotalLikesCount(prev => shouldLike ? Math.max(prev - 1, 0) : prev + 1);
       }
     }, 300),
     [sound?.id, currentUserId]
@@ -85,6 +88,10 @@ export default function SocialSection({ sound }) {
   const handleSoundLike = () => {
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
+    
+    // Update total likes count immediately for responsive UI
+    setTotalLikesCount(prev => newLikedState ? prev + 1 : Math.max(prev - 1, 0));
+    
     debouncedSoundLike(newLikedState);
   };
 
@@ -159,12 +166,15 @@ export default function SocialSection({ sound }) {
       const likesData = response.result?.data?.likes || [];
       setLikes(likesData);
       
+      // Set total likes count from response
+      setTotalLikesCount(response.result?.data?.totalLikes || 0);
+      
       // Update isLiked from the response
       if (response.result?.isLiked !== undefined) {
         setIsLiked(response.result.isLiked);
       }
       
-      console.log('Likes loaded:', likesData, 'isLiked:', response.result?.isLiked);
+      console.log('Likes loaded:', likesData, 'totalLikes:', response.result?.data?.totalLikes, 'isLiked:', response.result?.isLiked);
     } catch (error) {
       console.error('Error loading likes:', error);
       setLikes([]);
@@ -221,7 +231,7 @@ export default function SocialSection({ sound }) {
                 disabled={loading}
               >
                 <Heart className={`w-5 h-5 mr-2 ${isLiked ? "fill-current" : ""}`} />
-                {likes.length} Likes
+                {totalLikesCount} Likes
               </Button>
             </TooltipTrigger>
             <TooltipContent>
