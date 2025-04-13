@@ -16,11 +16,19 @@ import {
   RotateCw,
   Volume2, 
   VolumeX,
-  Trophy
+  Trophy,
+  ChevronDown, 
+  ChevronUp, 
+  Repeat 
 } from "lucide-react";
 import LeaderboardModal from "../components/sounds/LeaderboardModal";
 import SocialSection from "../components/sounds/SocialSection";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 // Firebase config reference
 const firebaseConfig = {
@@ -57,6 +65,11 @@ export default function MemeSoundPage() {
   // Leaderboard state
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [leaderboardStats, setLeaderboardStats] = useState([]);
+
+  // Advanced options state
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [echoCount, setEchoCount] = useState(0);
+  const [isConfigLocked, setIsConfigLocked] = useState(false);
   
   const [canApplyStats, setCanApplyStats] = useState(false);
   
@@ -584,7 +597,7 @@ const handleStatsUpdate = async (listenTime) => {
                       Apply to Stats
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>
+                  <TooltipContent side="bottom">
                     <p>Listen for at least 2 minutes to apply to your stats</p>
                   </TooltipContent>
                 </Tooltip>
@@ -658,6 +671,52 @@ const handleStatsUpdate = async (listenTime) => {
                   />
                 </div>
               </div>
+              
+              {/* Advanced options here, below volume control */}
+              <Collapsible
+                open={showAdvanced}
+                onOpenChange={setShowAdvanced}
+                className="mt-4"
+              >
+                <CollapsibleTrigger className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900">
+                  {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  Advanced Options
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-3">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-sm font-medium text-gray-700">Echo Effect</label>
+                      <Button
+                        size="sm"
+                        variant={isConfigLocked ? "destructive" : "default"}
+                        onClick={() => setIsConfigLocked(!isConfigLocked)}
+                        disabled={isPlaying}
+                      >
+                        {isConfigLocked ? "Unlock Configuration" : "Lock Configuration"}
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Repeat className="w-4 h-4 text-gray-500" />
+                      <input
+                        type="range"
+                        min="0"
+                        max="5"
+                        step="1"
+                        value={echoCount}
+                        onChange={(e) => setEchoCount(parseInt(e.target.value))}
+                        disabled={isConfigLocked || isPlaying}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <span className="text-sm font-medium w-8">{echoCount}x</span>
+                    </div>
+                    {(isPlaying || isConfigLocked) && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        Echo configuration cannot be changed while playing or when locked
+                      </p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-4 mt-4">
@@ -693,8 +752,6 @@ const handleStatsUpdate = async (listenTime) => {
 
             <SocialSection sound={sound} />
           </div>
-
-          {/* ... keep rest of the component */}
         </Card>
       </div>
       

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,9 +49,9 @@ export default function SoundCard({ sound }) {
       setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
 
       if (isLiked) {
-        await SocialService.unlikeSound(sound.id);
+        await SocialService.unlike('sound', sound.id);
       } else {
-        await SocialService.likeSound(sound.id);
+        await SocialService.like('sound', sound.id);
       }
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -81,11 +80,11 @@ export default function SoundCard({ sound }) {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
-        <Link 
-          to={soundUrl}
-          state={soundState}
-          className="inline-flex"
-        >
+              <Link 
+                to={soundUrl}
+                state={soundState}
+                className="inline-flex"
+              >
                 <Button
                   className="bg-purple-600 hover:bg-purple-700"
                   size="sm"

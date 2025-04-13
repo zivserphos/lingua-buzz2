@@ -1,26 +1,14 @@
+
 import React, { useState, useEffect } from "react";
-import { Crown, Clock, Trophy, ArrowLeft, Flame, UserCircle, Music, Medal } from "lucide-react";
+import { Crown, Clock, Trophy, ArrowLeft, Music, Medal, Award } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  ArrowLeft, 
-  Clock, 
-  Loader2, 
-  Trophy,
-  Award
-} from "lucide-react";
-// other imports...
-// REMOVE THIS LINE: import { fetchLeaderboard } from "@/components/services/LeaderboardService";
+import { Loader2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import LeaderboardService from "@/components/services/LeaderboardService";
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState("all_time");
@@ -29,8 +17,6 @@ export default function LeaderboardPage() {
   const [error, setError] = useState(null);
   const [stats, setStats] = useState([]);
 
-  // ADD THIS FUNCTION DIRECTLY IN THE COMPONENT
-  // This bypasses any module loading issues
   const fetchLeaderboardDirectly = async (sortBy = 'total_listen_time', period = 'all_time', limit = 10) => {
     const LEADERBOARD_URL = 'https://getleaderboard-stbfcg576q-uc.a.run.app';
     const token = localStorage.getItem('access_token');
@@ -66,7 +52,6 @@ export default function LeaderboardPage() {
     }
   };
 
-  // Simplified useEffect
   useEffect(() => {
     loadLeaderboard().catch(err => {
       console.error("Error in loadLeaderboard:", err);
@@ -75,13 +60,11 @@ export default function LeaderboardPage() {
     });
   }, [activeTab, sortBy]);
 
-  // Update this function to use the inline function
   const loadLeaderboard = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // Use the inline function instead of the imported one
       const data = await fetchLeaderboardDirectly(sortBy, activeTab);
       console.log('Leaderboard data received:', data);
       
@@ -101,8 +84,6 @@ export default function LeaderboardPage() {
       throw err;
     }
   };
-
-  // Rest of your component remains the same
 
   const formatTime = (seconds) => {
     if (!seconds && seconds !== 0) return "0h 0m";
@@ -152,10 +133,24 @@ export default function LeaderboardPage() {
         </div>
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-          <Tabs defaultValue="all_time" className="w-full max-w-md" onValueChange={setActiveTab}>
+          <Tabs 
+            value={activeTab} 
+            onValueChange={setActiveTab} 
+            className="w-full max-w-md"
+          >
             <TabsList className="bg-white/50 backdrop-blur-sm border p-1 w-full">
-              <TabsTrigger value="all_time" className="flex-1">All Time Legends</TabsTrigger>
-              <TabsTrigger value="weekly" className="flex-1">Weekly Warriors</TabsTrigger>
+              <TabsTrigger 
+                value="all_time" 
+                className={`flex-1 ${activeTab === 'all_time' ? 'bg-white shadow-sm' : ''}`}
+              >
+                All Time Legends
+              </TabsTrigger>
+              <TabsTrigger 
+                value="weekly" 
+                className={`flex-1 ${activeTab === 'weekly' ? 'bg-white shadow-sm' : ''}`}
+              >
+                Weekly Warriors
+              </TabsTrigger>
             </TabsList>
           </Tabs>
 

@@ -16,13 +16,13 @@ import SocialService from '@/components/services/SocialService';
 
 export default function SocialSection({ sound }) {
   const [comments, setComments] = useState([]);
-  const [likes, setLikes] = useState([]);
   const [isLiked, setIsLiked] = useState(sound?.isLiked || false);
   const [totalLikesCount, setTotalLikesCount] = useState(sound?.num_of_likes || 0);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [likedComments, setLikedComments] = useState(new Set());
-  const currentUserId = 'user123'; // Replace with actual user ID
+  // This would be replaced with actual user ID from auth context
+  const currentUserId = 'current_user'; 
 
   // Debounced like handlers with local state updates
   const debouncedSoundLike = useCallback(
@@ -30,14 +30,10 @@ export default function SocialSection({ sound }) {
       try {
         if (shouldLike) {
           await SocialService.like('sound', sound.id);
-          // Update local state directly without reloading
-          setLikes(prevLikes => [...prevLikes, { userId: currentUserId }]);
         } else {
           await SocialService.unlike('sound', sound.id);
-          // Update local state directly without reloading
-          setLikes(prevLikes => prevLikes.filter(like => like.userId !== currentUserId));
         }
-        // Don't call loadLikes() - that's causing extra API calls
+        // We don't need to reload likes since we're updating UI optimistically
       } catch (error) {
         console.error('Error with sound like:', error);
         // Revert UI state on error
@@ -46,7 +42,7 @@ export default function SocialSection({ sound }) {
         setTotalLikesCount(prev => shouldLike ? Math.max(prev - 1, 0) : prev + 1);
       }
     }, 300),
-    [sound?.id, currentUserId]
+    [sound?.id]
   );
 
   const debouncedCommentLike = useCallback(
@@ -67,15 +63,16 @@ export default function SocialSection({ sound }) {
           return newSet;
         });
         
-        // Also revert the comment count
+        // Also revert the comment likes count
         setComments(prevComments => 
           prevComments.map(comment => 
             comment.id === commentId 
               ? { 
                   ...comment, 
-                  likes: shouldLike 
-                    ? Math.max((comment.likes || 0) - 1, 0) 
-                    : (comment.likes || 0) + 1
+                  num_of_likes: shouldLike 
+                    ? Math.max((comment.num_of_likes || 0) - 1, 0) 
+                    : (comment.num_of_likes || 0) + 1,
+                  isLiked: !shouldLike
                 } 
               : comment
           )
@@ -117,9 +114,10 @@ export default function SocialSection({ sound }) {
         comment.id === commentId 
           ? { 
               ...comment, 
-              likes: shouldLike 
-                ? (comment.likes || 0) + 1 
-                : Math.max((comment.likes || 0) - 1, 0)
+              num_of_likes: shouldLike 
+                ? (comment.num_of_likes || 0) + 1 
+                : Math.max((comment.num_of_likes || 0) - 1, 0),
+              isLiked: shouldLike
             } 
           : comment
       )
@@ -132,7 +130,9 @@ export default function SocialSection({ sound }) {
   useEffect(() => {
     if (sound?.id) {
       loadComments();
-      loadLikes();
+      // Initialize isLiked and totalLikesCount from sound object
+      setIsLiked(sound.isLiked || false);
+      setTotalLikesCount(sound.num_of_likes || 0);
     }
   }, [sound?.id]);
 
@@ -143,7 +143,7 @@ export default function SocialSection({ sound }) {
       const commentsData = response.result?.data?.comments || [];
       setComments(commentsData);
       
-      // Setup initial liked comments state
+      // Setup initial liked comments state based on isLiked property
       const newLikedComments = new Set();
       commentsData.forEach(comment => {
         if (comment.isLiked) {
@@ -159,51 +159,35 @@ export default function SocialSection({ sound }) {
     }
   };
 
-  const loadLikes = async () => {
-    try {
-      const response = await SocialService.getLikes(sound.id);
-      // Update this line to correctly extract likes from the response
-      const likesData = response.result?.data?.likes || [];
-      setLikes(likesData);
-      
-      // Set total likes count from response
-      setTotalLikesCount(response.result?.data?.totalLikes || 0);
-      
-      // Update isLiked from the response
-      if (response.result?.isLiked !== undefined) {
-        setIsLiked(response.result.isLiked);
-      }
-      
-      console.log('Likes loaded:', likesData, 'totalLikes:', response.result?.data?.totalLikes, 'isLiked:', response.result?.isLiked);
-    } catch (error) {
-      console.error('Error loading likes:', error);
-      setLikes([]);
-    }
-  };
-
   const handleComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
     const commentText = newComment;
-    const tempId = Date.now().toString();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Create a temporary comment for immediate UI feedback
     const tempComment = {
       id: tempId,
       text: commentText,
       userId: currentUserId,
-      createdAt: { _seconds: Date.now() / 1000 },
-      likes: 0,
+      createdAt: { _seconds: Math.floor(Date.now() / 1000) },
+      num_of_likes: 0,
       isLiked: false
     };
 
+    // Optimistically add to UI
     setComments(prev => [tempComment, ...prev]);
     setNewComment('');
 
     try {
+      // Make actual API call
       await SocialService.addComment(sound.id, commentText);
-      loadComments(); // Refresh to get the real comment data
+      // Refresh comments to get the real data
+      loadComments();
     } catch (error) {
       console.error('Error adding comment:', error);
+      // Revert UI change on error
       setComments(prev => prev.filter(c => c.id !== tempId));
       setNewComment(commentText);
     }
@@ -215,7 +199,14 @@ export default function SocialSection({ sound }) {
     
     // Convert Firestore timestamp to JS Date
     const date = new Date(timestamp._seconds * 1000);
-    return date.toLocaleDateString();
+    // Format the date nicely for display
+    return date.toLocaleString();
+  };
+  
+  // Helper to get user initials
+  const getUserInitials = (userId) => {
+    if (!userId) return '?';
+    return userId.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -273,7 +264,7 @@ export default function SocialSection({ sound }) {
                 <Avatar>
                   <AvatarImage src={comment.user_image} />
                   <AvatarFallback>
-                    {comment.userId ? comment.userId.substring(0, 1) : '?'}
+                    {getUserInitials(comment.userId)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
@@ -293,7 +284,7 @@ export default function SocialSection({ sound }) {
                       <Heart className={`w-4 h-4 ${
                         likedComments.has(comment.id) ? 'fill-current' : ''
                       }`} />
-                      {comment.likes || 0}
+                      {comment.num_of_likes || 0}
                     </button>
                     <span className="text-xs text-gray-400">
                       {formatTimestamp(comment.createdAt)}
