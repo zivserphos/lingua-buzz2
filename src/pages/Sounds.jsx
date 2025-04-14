@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import LanguageSelector from "../components/sounds/LanguageSelector";
 import SoundCard from "../components/sounds/SoundCard";
 import Search from "../components/sounds/Search";
@@ -13,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { debounce } from 'lodash';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -757,6 +759,22 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
     }
   };
 
+  // Add debounced search function
+  const debouncedSearch = useCallback(
+    debounce((term) => {
+      if (term !== searchTerm) {
+        setSearchTerm(term);
+        resetAndFetchSounds();
+      }
+    }, 500),
+    [searchTerm, resetAndFetchSounds]
+  );
+
+  const handleSearchInput = (value) => {
+    setSearchTerm(value);
+    debouncedSearch(value);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -814,9 +832,9 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              Viral Language Sounds
+              Brainrot Hottest Memes 🔥
             </h1>
-            <p className="text-gray-600 mt-2">Learn languages through trending sounds 🎵</p>
+            <p className="text-gray-600 mt-2">Go crazy with looping brainrot meme sounds with funny effects</p>
           </div>
 
           <div className="flex items-center gap-4">
@@ -890,8 +908,8 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
           <div className="flex-1 w-full">
             <Search 
               value={searchTerm} 
-              onChange={setSearchTerm} 
-              onSearch={handleSearch}
+              onChange={handleSearchInput} 
+              onSearch={resetAndFetchSounds}
             />
           </div>
           <LanguageSelector 
