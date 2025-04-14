@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -60,7 +59,8 @@ export default function MemeSoundPage() {
   const [isMuted, setIsMuted] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [totalListenTime, setTotalListenTime] = useState(0);
+  const [statsUpdated, setStatsUpdated] = useState(false);
+  const [updatingStats, setUpdatingStats] = useState(false);
   
   // Leaderboard state
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -71,17 +71,70 @@ export default function MemeSoundPage() {
   const [echoCount, setEchoCount] = useState(0);
   const [isConfigLocked, setIsConfigLocked] = useState(false);
   
-  const [canApplyStats, setCanApplyStats] = useState(false);
-  
+  // Audio refs
   const audioRef = useRef(null);
   const timerRef = useRef(null);
+  const statsUpdateSent = useRef(false);
+  const audioContextRef = useRef(null);
+  const audioSourcesRef = useRef([]);
+  const audioBufferRef = useRef(null);
+  const gainNodeRef = useRef(null);
+
+    useEffect(() => {
+    // Clean up session ID on unmount
+    return () => {
+      localStorage.removeItem('current_session_id');
+    };
+  }, []);
+
+  useEffect(() => {
+  // Refresh token every 50 minutes (tokens expire at 60 minutes)
+  const tokenRefreshInterval = setInterval(async () => {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      console.log('Proactively refreshing token before expiration');
+      await refreshAccessToken(refreshToken);
+    }
+  }, 50 * 60 * 1000);
+  
+  return () => clearInterval(tokenRefreshInterval);
+}, []);
 
   useEffect(() => {
     if (audioRef.current && sound?.audio_url) {
       audioRef.current.src = sound.audio_url;
       audioRef.current.load();
+      
+      // Preload audio for Web Audio API if we have a sound
+      preloadAudioBuffer(sound.audio_url);
     }
+    
+    // Cleanup Web Audio API resources when component unmounts
+    return () => {
+      stopAllAudioSources();
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
   }, [sound?.audio_url]);
+
+  // Preload audio buffer for Web Audio API
+  const preloadAudioBuffer = async (url) => {
+    try {
+      // Create Audio Context if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      
+      const response = await fetch(url);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      audioBufferRef.current = audioBuffer;
+      console.log('Audio buffer loaded successfully');
+    } catch (err) {
+      console.error('Error preloading audio buffer:', err);
+    }
+  };
 
   useEffect(() => {
     fetchSoundDetails();
@@ -104,13 +157,40 @@ export default function MemeSoundPage() {
         crazy_mode_count: 15
       }
     ]);
-  }, [decodedName]); // Re-fetch when name changes
+    
+    // Cleanup on unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      // Only update stats if we played for some time and haven't already sent stats
+      if (elapsedTime > 0 && !statsUpdateSent.current) {
+        handleStatsUpdate(elapsedTime);
+        statsUpdateSent.current = true;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
       audioRef.current.playbackRate = playbackRate;
     }
+    
+    // Update playback rate of all active Web Audio sources
+    audioSourcesRef.current.forEach(source => {
+      if (source && source.playbackRate) {
+        source.playbackRate.value = playbackRate;
+      }
+    });
   }, [playbackRate]);
+
+  // Update volume for Web Audio API when volume changes
+  useEffect(() => {
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = isMuted ? 0 : volume;
+    }
+  }, [volume, isMuted]);
 
   // Function to refresh token if needed
   const refreshAccessToken = async (refreshToken) => {
@@ -155,39 +235,106 @@ export default function MemeSoundPage() {
     }
   };
 
-  const fetchSoundDetails = async () => {
-   if (!decodedName && !soundName && !soundId) {
+const fetchSoundDetails = async (retryCount = 0) => {
+  // Parameter validation
+  if (!decodedName && !soundName && !soundId) {
     setError("Sound information is required");
     setLoading(false);
     return;
   }
+  
+  // Prevent too many retries
+  if (retryCount > 2) {
+    setError("Failed after multiple attempts. Please try again later.");
+    setLoading(false);
+    return;
+  }
+  
+  // Offline detection
+  if (!navigator.onLine) {
+    setError("You appear to be offline. Please check your connection.");
+    setLoading(false);
+    return;
+  }
+  
+  setLoading(true);
+  
+  try {
+    console.log(`Fetching sound details for ID: ${soundId}, Name: ${soundName || 'Unknown'}`);
     
-    setLoading(true);
+    // Get token from localStorage
+    let accessToken = localStorage.getItem('access_token');
     
-    try {
-      console.log(`Fetching sound details for ID: ${soundId}, Name: ${soundName || 'Unknown'}`);
-      
-      // Get token from localStorage
-      let accessToken = localStorage.getItem('access_token');
-      
-      // If no token is available, try to refresh using the refresh token
-      if (!accessToken) {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          accessToken = await refreshAccessToken(refreshToken);
-        }
-        
-        if (!accessToken) {
-          console.warn("No access token available. Request may fail with 401.");
-        }
+    // If no token is available, try to refresh using the refresh token
+    if (!accessToken) {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        accessToken = await refreshAccessToken(refreshToken);
       }
       
-      // SEARCH STRATEGY:
-      
-      // 1. Search using sound name if available (preferred), otherwise use the URL parameter
-      const searchTerm = soundName || decodedName;
-      
-      const primarySearchResponse = await fetch(
+      if (!accessToken) {
+        console.warn("No access token available. Request may fail with 401.");
+      }
+    }
+    
+    // SEARCH STRATEGY:
+    
+    // 1. Search using sound name if available (preferred), otherwise use the URL parameter
+    const searchTerm = soundName || decodedName;
+    
+    const primarySearchResponse = await fetch(
+      'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify({
+          language: "English", 
+          limit: 10,
+          page: 1,
+          search: searchTerm // Use name as search parameter instead of id
+        }),
+      }
+    );
+    
+    // Handle 401 Unauthorized
+    if (primarySearchResponse.status === 401) {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        const newToken = await refreshAccessToken(refreshToken);
+        if (newToken) {
+          return fetchSoundDetails(retryCount + 1);
+        }
+      }
+      throw new Error('Authentication required. Please log in.');
+    }
+    
+    if (primarySearchResponse.ok) {
+      const searchData = await primarySearchResponse.json();
+      if (searchData.result?.success && searchData.result.data?.length > 0) {
+        // If we have the soundId, try to find an exact match
+        if (soundId) {
+          const exactMatch = searchData.result.data.find(s => s.id === soundId);
+          if (exactMatch) {
+            setSound(exactMatch);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Otherwise use the first result
+        setSound(searchData.result.data[0]);
+        setLoading(false);
+        return;
+      }
+    }
+    
+    // 2. If first search failed and we're using a different search term than decodedName,
+    // try with decodedName as a fallback
+    if (searchTerm !== decodedName) {
+      const fallbackSearchResponse = await fetch(
         'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
         {
           method: 'POST',
@@ -199,29 +346,29 @@ export default function MemeSoundPage() {
             language: "English", 
             limit: 10,
             page: 1,
-            search: searchTerm // Use name as search parameter instead of id
+            search: decodedName
           }),
         }
       );
       
-      // Handle 401 Unauthorized
-      if (primarySearchResponse.status === 401) {
+      // Also check for 401 here
+      if (fallbackSearchResponse.status === 401) {
         const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
           const newToken = await refreshAccessToken(refreshToken);
           if (newToken) {
-            return fetchSoundDetails();
+            return fetchSoundDetails(retryCount + 1);
           }
         }
         throw new Error('Authentication required. Please log in.');
       }
       
-      if (primarySearchResponse.ok) {
-        const searchData = await primarySearchResponse.json();
-        if (searchData.result?.success && searchData.result.data?.length > 0) {
-          // If we have the soundId, try to find an exact match
+      if (fallbackSearchResponse.ok) {
+        const fallbackData = await fallbackSearchResponse.json();
+        if (fallbackData.result?.success && fallbackData.result.data?.length > 0) {
+          // Try to find the exact match by ID first
           if (soundId) {
-            const exactMatch = searchData.result.data.find(s => s.id === soundId);
+            const exactMatch = fallbackData.result.data.find(s => s.id === soundId);
             if (exactMatch) {
               setSound(exactMatch);
               setLoading(false);
@@ -229,187 +376,298 @@ export default function MemeSoundPage() {
             }
           }
           
-          // Otherwise use the first result
-          setSound(searchData.result.data[0]);
+          setSound(fallbackData.result.data[0]);
           setLoading(false);
           return;
         }
       }
-      
-      // 2. If first search failed and we're using a different search term than decodedName,
-      // try with decodedName as a fallback
-      if (searchTerm !== decodedName) {
-        const fallbackSearchResponse = await fetch(
-          'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-            },
-            body: JSON.stringify({
-              language: "English", 
-              limit: 10,
-              page: 1,
-              search: decodedName
-            }),
-          }
-        );
+    }
+    
+    // 3. Last resort: get all sounds and filter
+    const response = await fetch(
+      'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+        },
+        body: JSON.stringify({
+          language: "English", 
+          limit: 100,
+          page: 1,
+          search: "" // Empty search to get all sounds
+        }),
+      }
+    );
+    
+    // Check for 401 one more time
+    if (response.status === 401) {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        const newToken = await refreshAccessToken(refreshToken);
+        if (newToken) {
+          return fetchSoundDetails(retryCount + 1);
+        }
+      }
+      throw new Error('Authentication required. Please log in.');
+    }
+
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const data = await response.json();
+    
+    if (!data.result?.success) throw new Error('Invalid response format');
+    
+    // First try to find by ID
+    let foundSound = data.result.data?.find(sound => sound.id === soundId);
+    
+    // If not found by ID, try by name
+    if (!foundSound && soundName) {
+      foundSound = data.result.data?.find(sound => 
+        sound.name.toLowerCase() === soundName.toLowerCase()
+      );
+    }
+    
+    // Try partial name match
+    if (!foundSound) {
+      foundSound = data.result.data?.find(sound => 
+        sound.name.toLowerCase().includes(decodedName.toLowerCase()) ||
+        (soundName && sound.name.toLowerCase().includes(soundName.toLowerCase()))
+      );
+    }
+    
+    if (foundSound) {
+      setSound(foundSound);
+    } else {
+      throw new Error(`Sound "${searchTerm}" not found`);
+    }
+  } catch (err) {
+    console.error("Error fetching sound:", err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleStatsUpdate = async (listenTime) => {
+  if (listenTime < 2 || !sound?.id || statsUpdateSent.current) return;
+  
+  try {
+    console.log('Updating stats:', { listenTime, soundId: sound.id });
+    setUpdatingStats(true);
+    
+    // Track that we're sending stats to prevent duplicate sends
+    statsUpdateSent.current = true;
+    
+    // Add a unique session ID to help prevent duplicate submissions
+    const sessionId = localStorage.getItem('current_session_id') || 
+                      `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Store the session ID for this tab
+    if (!localStorage.getItem('current_session_id')) {
+      localStorage.setItem('current_session_id', sessionId);
+    }
+    
+    // Calculate actual play time more accurately (to prevent client-side tampering)
+    const actualPlayTime = Math.min(listenTime, elapsedTime); // Can't be more than elapsed time
+    
+    // Implement reasonable maximum values
+    const reasonableListenTime = Math.min(actualPlayTime, 7200); // Cap at 2 hours
+    
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      console.error('Authentication required');
+      return;
+    }
+    
+    // Include session ID and timestamp in request
+    const response = await fetch('https://updateuserstats-stbfcg576q-uc.a.run.app', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        listenTime: reasonableListenTime,
+        soundsPlayed: 1,
+        soundId: sound.id,
+        language: sound.language || "English",
+        effectUsed: echoCount > 0 ? `echo_${echoCount}` : null,
+        sessionDuration: reasonableListenTime,
+        sessionId: sessionId, // Include session ID to prevent duplicates
+        clientTimestamp: new Date().toISOString() // Include timestamp
+      })
+    });
+    
+    // Clear session ID when component unmounts or on successful update
+    localStorage.removeItem('current_session_id');
+    
+    if (!response.ok) {
+      if (response.status === 429) {
+        console.log('Rate limited or duplicate submission detected');
+      }
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log('Stats update response:', data);
+    setStatsUpdated(true);
+    
+  } catch (err) {
+    console.error('Error updating stats:', err);
+  } finally {
+    setUpdatingStats(false);
+  }
+};
+
+  // Stop all audio sources
+  const stopAllAudioSources = () => {
+    audioSourcesRef.current.forEach(source => {
+      if (source && typeof source.stop === 'function') {
+        try {
+          source.stop();
+        } catch (e) {
+          // Ignore errors if the source is already stopped
+        }
+      }
+    });
+    audioSourcesRef.current = [];
+  };
+
+  // Play with Web Audio API and echo effect
+  const playWithEcho = async () => {
+    if (!sound?.audio_url || !audioBufferRef.current) {
+      console.error("Audio not available or not loaded");
+      return;
+    }
+
+    try {
+      // Create audio context if it doesn't exist
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      // Resume audio context if suspended
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
+      // Create a master gain node for volume control
+      gainNodeRef.current = audioContextRef.current.createGain();
+      gainNodeRef.current.gain.value = isMuted ? 0 : volume;
+      gainNodeRef.current.connect(audioContextRef.current.destination);
+
+      // Clear any existing sources
+      stopAllAudioSources();
+
+      // Determine actual number of instances to play
+      // echoCount is 0-5 from UI slider, but we'll scale it to get up to 20 instances
+      let instanceCount = echoCount === 0 ? 1 : (echoCount * 4); // 0, 4, 8, 12, 16, 20
+      instanceCount = Math.min(instanceCount, 20); // Cap at 20
+
+      console.log(`Playing sound with ${instanceCount} echo instances`);
+
+      // Play the instances
+      for (let i = 0; i < instanceCount; i++) {
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = audioBufferRef.current;
         
-        if (fallbackSearchResponse.ok) {
-          const fallbackData = await fallbackSearchResponse.json();
-          if (fallbackData.result?.success && fallbackData.result.data?.length > 0) {
-            // Try to find the exact match by ID first
-            if (soundId) {
-              const exactMatch = fallbackData.result.data.find(s => s.id === soundId);
-              if (exactMatch) {
-                setSound(exactMatch);
-                setLoading(false);
-                return;
-              }
+        // Set playback rate to match current setting
+        source.playbackRate.value = playbackRate;
+        
+        // Create stereo panner for position
+        const panner = audioContextRef.current.createStereoPanner();
+        
+        // Calculate pan and detune values
+        // First instance is centered with no detune
+        let pan = 0;
+        let detune = 0;
+        
+        if (i > 0) {
+          // For echo instances, create varying pan and detune values
+          pan = Math.sin((i / instanceCount) * Math.PI * 2) * 0.8; // Distribute across stereo field
+          detune = ((i / instanceCount) * 100) - 50; // Detune between -50 and +50 cents
+        }
+        
+        panner.pan.value = pan;
+        source.detune.value = detune;
+        
+        // Connect source to panner to gain node to destination
+        source.connect(panner);
+        panner.connect(gainNodeRef.current);
+        
+        // Set loop if needed
+        source.loop = isLooping;
+        
+        // Start playback
+        source.start(0);
+        
+        // Save reference to the source
+        audioSourcesRef.current.push(source);
+        
+        // Add onended handler for the main source only
+        if (i === 0) {
+          source.onended = () => {
+            if (!isLooping) {
+              setIsPlaying(false);
+              stopAllAudioSources();
             }
-            
-            setSound(fallbackData.result.data[0]);
-            setLoading(false);
+          };
+        }
+      }
+    } catch (err) {
+      console.error("Error playing audio with Web Audio API:", err);
+      setError("Could not play audio with echo effect: " + err.message);
+      
+      // Fallback to regular audio playback
+      if (audioRef.current) {
+        audioRef.current.play().catch(e => {
+          console.error("Fallback audio playback failed:", e);
+        });
+      }
+    }
+  };
+
+  // Toggle play/pause with stats tracking and echo effect
+  const togglePlay = async () => {
+    if (isPlaying) {
+      // Stop all audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      stopAllAudioSources();
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      setIsPlaying(false);
+    } else {
+      // Start playback with or without echo
+      if (echoCount > 0) {
+        // Use Web Audio API for echo effect
+        await playWithEcho();
+      } else {
+        // Use regular HTML Audio element for normal playback
+        if (audioRef.current) {
+          try {
+            await audioRef.current.play();
+          } catch (err) {
+            console.error("Error playing audio:", err);
+            setError("Could not play audio: " + err.message);
             return;
           }
         }
       }
       
-      // 3. Last resort: get all sounds and filter
-      const response = await fetch(
-        'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-          },
-          body: JSON.stringify({
-            language: "English", 
-            limit: 100,
-            page: 1,
-            search: "" // Empty search to get all sounds
-          }),
-        }
-      );
-  
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-      const data = await response.json();
-      
-      if (!data.result?.success) throw new Error('Invalid response format');
-      
-      // First try to find by ID
-      let foundSound = data.result.data?.find(sound => sound.id === soundId);
-      
-      // If not found by ID, try by name
-      if (!foundSound && soundName) {
-        foundSound = data.result.data?.find(sound => 
-          sound.name.toLowerCase() === soundName.toLowerCase()
-        );
-      }
-      
-      // Try partial name match
-      if (!foundSound) {
-        foundSound = data.result.data?.find(sound => 
-          sound.name.toLowerCase().includes(decodedName.toLowerCase()) ||
-          (soundName && sound.name.toLowerCase().includes(soundName.toLowerCase()))
-        );
-      }
-      
-      if (foundSound) {
-        setSound(foundSound);
-      } else {
-        throw new Error(`Sound "${searchTerm}" not found`);
-      }
-    } catch (err) {
-      console.error("Error fetching sound:", err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-const handleStatsUpdate = async (listenTime) => {
-  if (listenTime > 0 && sound?.id) {
-    try {
-      console.log('Updating stats:', { listenTime, soundId: sound.id });
-      
-      // Implement the API call directly instead of using imported function
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        console.error('Authentication required');
-        return;
-      }
-      
-      const response = await fetch('https://updateuserstats-stbfcg576q-uc.a.run.app', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          listenTime: listenTime,
-          soundsPlayed: 1,
-          soundId: sound.id
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Stats update response:', data);
-      
-    } catch (err) {
-      console.error('Error updating stats:', err);
-      // Don't show error to user, just log it
-    }
-  }
-};
-
-  // Update togglePlay to include stats update
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        // Only update stats if we actually played for some time
-        if (elapsedTime > 0) {
-          handleStatsUpdate(elapsedTime);
-        }
-      }
-    } else {
-      audioRef.current.play().catch(err => {
-        console.error("Error playing audio:", err);
-        setError("Could not play audio: " + err.message);
-      });
-      
+      // Start timer for stats tracking
       timerRef.current = setInterval(() => {
         setElapsedTime(prev => prev + 1);
       }, 1000);
+      
+      setIsPlaying(true);
     }
-    setIsPlaying(!isPlaying);
   };
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      // Only update stats if we actually played for some time
-      if (elapsedTime > 0) {
-        handleStatsUpdate(elapsedTime);
-      }
-    };
-  }, []);
-
-  // Rest of the component remains unchanged
 
   const handlePlaybackRateChange = (e) => {
     const value = parseFloat(e.target.value);
@@ -420,9 +678,17 @@ const handleStatsUpdate = async (listenTime) => {
   };
 
   const toggleMute = () => {
-    if (!audioRef.current) return;
-    audioRef.current.muted = !isMuted;
-    setIsMuted(!isMuted);
+    const newMuteState = !isMuted;
+    setIsMuted(newMuteState);
+    
+    if (audioRef.current) {
+      audioRef.current.muted = newMuteState;
+    }
+    
+    // Also update Web Audio API gain node
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = newMuteState ? 0 : volume;
+    }
   };
 
   const handleVolumeChange = (e) => {
@@ -438,12 +704,27 @@ const handleStatsUpdate = async (listenTime) => {
         audioRef.current.muted = false;
       }
     }
+    
+    // Also update Web Audio API gain node
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = value;
+    }
   };
 
   const toggleLoop = () => {
-    if (!audioRef.current) return;
-    audioRef.current.loop = !isLooping;
-    setIsLooping(!isLooping);
+    const newLoopState = !isLooping;
+    setIsLooping(newLoopState);
+    
+    if (audioRef.current) {
+      audioRef.current.loop = newLoopState;
+    }
+    
+    // Update loop state for Web Audio sources
+    audioSourcesRef.current.forEach(source => {
+      if (source) {
+        source.loop = newLoopState;
+      }
+    });
   };
 
   const handleDownload = () => {
@@ -470,22 +751,9 @@ const handleStatsUpdate = async (listenTime) => {
       });
   };
 
-  // Update stats tracking
-  useEffect(() => {
-    if (elapsedTime >= 120) {
-      setCanApplyStats(true);
-    }
-  }, [elapsedTime]);
-
   const handleApplyStats = async () => {
     if (elapsedTime >= 120) {
-      try {
-        await handleStatsUpdate(elapsedTime);
-        setElapsedTime(0);
-        setCanApplyStats(false);
-      } catch (err) {
-        console.error('Error applying stats:', err);
-      }
+      await handleStatsUpdate(elapsedTime);
     }
   };
 
@@ -494,6 +762,45 @@ const handleStatsUpdate = async (listenTime) => {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Reset stats on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
+      // Only update stats if we played for some time and haven't already sent stats
+      if (elapsedTime >= 120 && !statsUpdateSent.current) {
+        handleStatsUpdate(elapsedTime);
+      }
+    };
+  }, [elapsedTime]);
+
+  // If echo count changes and we're playing, restart to apply the new echo settings
+  useEffect(() => {
+    if (isPlaying && !isConfigLocked) {
+      // Restart playback with new settings
+      const restartPlayback = async () => {
+        stopAllAudioSources();
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+        
+        // Small delay to ensure everything stops properly
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        if (echoCount > 0) {
+          await playWithEcho();
+        } else if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+          audioRef.current.play().catch(err => console.error("Error restarting audio:", err));
+        }
+      };
+      
+      restartPlayback();
+    }
+  }, [echoCount]);
 
   if (loading) {
     return (
@@ -570,70 +877,93 @@ const handleStatsUpdate = async (listenTime) => {
             </div>
           </div>
 
-          {/* Rest of the UI remains the same */}
           <div className="p-6 space-y-6">
-            <div className="flex flex-wrap gap-4">
-              <Button
-                onClick={togglePlay}
-                className="bg-purple-600 hover:bg-purple-700 h-12 px-6"
-              >
-                {isPlaying ? (
-                  <PauseCircle className="w-6 h-6 mr-2" />
-                ) : (
-                  <PlayCircle className="w-6 h-6 mr-2" />
-                )}
-                {isPlaying ? 'Pause' : 'Play'}
-              </Button>
+              <div className="flex flex-wrap gap-4">
+                <Button
+                  onClick={togglePlay}
+                  className="bg-purple-600 hover:bg-purple-700 h-12 px-6"
+                >
+                  {isPlaying ? (
+                    <PauseCircle className="w-6 h-6 mr-2" />
+                  ) : (
+                    <PlayCircle className="w-6 h-6 mr-2" />
+                  )}
+                  {isPlaying ? 'Pause' : 'Play'}
+                </Button>
 
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      onClick={handleApplyStats}
-                      className={`h-12 ${canApplyStats ? "bg-green-600 hover:bg-green-700" : "bg-gray-400"}`}
-                      disabled={!canApplyStats}
-                    >
+                {/* Complete solution for fully visible tooltip with disabled button */}
+                <div className="relative inline-block"> {/* Container with relative positioning */}
+                  <Button 
+                    onClick={handleApplyStats}
+                    className={`h-12 ${
+                      statsUpdated 
+                        ? "bg-green-600 hover:bg-green-700" 
+                        : elapsedTime >= 120 
+                          ? "bg-purple-600 hover:bg-purple-700" 
+                          : "bg-gray-400"
+                    }`}
+                    disabled={elapsedTime < 120 || statsUpdated || updatingStats}
+                  >
+                    {updatingStats ? (
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    ) : (
                       <Trophy className="w-5 h-5 mr-2" />
-                      Apply to Stats
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>Listen for at least 2 minutes to apply to your stats</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+                    )}
+                    {statsUpdated 
+                      ? "Stats Applied!" 
+                      : updatingStats 
+                        ? "Applying..." 
+                        : "Apply to Stats"
+                    }
+                  </Button>
+                  
+                  {/* Overlay div that serves as tooltip trigger - covers the entire button area */}
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div 
+                        className="absolute inset-0 cursor-help" 
+                        aria-label="Stats info" 
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={5}>
+                      <p>Listen for at least 2 minutes to apply to your stats</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                </div>
 
-              <Button
-                onClick={toggleLoop}
-                variant={isLooping ? "default" : "outline"}
-                className={`h-12 ${isLooping ? "bg-green-600 hover:bg-green-700" : ""}`}
-              >
-                <RotateCw className="w-5 h-5 mr-2" />
-                {isLooping ? "Looping On" : "Loop"}
-              </Button>
+                <Button
+                  onClick={toggleLoop}
+                  variant={isLooping ? "default" : "outline"}
+                  className={`h-12 ${isLooping ? "bg-green-600 hover:bg-green-700" : ""}`}
+                >
+                  <RotateCw className="w-5 h-5 mr-2" />
+                  {isLooping ? "Looping On" : "Loop"}
+                </Button>
 
-              <Button
-                onClick={toggleMute}
-                variant="outline"
-                className="h-12"
-              >
-                {isMuted ? (
-                  <VolumeX className="w-5 h-5 mr-2" />
-                ) : (
-                  <Volume2 className="w-5 h-5 mr-2" />
-                )}
-                {isMuted ? "Unmute" : "Mute"}
-              </Button>
+                <Button
+                  onClick={toggleMute}
+                  variant="outline"
+                  className="h-12"
+                >
+                  {isMuted ? (
+                    <VolumeX className="w-5 h-5 mr-2" />
+                  ) : (
+                    <Volume2 className="w-5 h-5 mr-2" />
+                  )}
+                  {isMuted ? "Unmute" : "Mute"}
+                </Button>
 
-              <Button
-                onClick={handleDownload}
-                variant="outline"
-                className="h-12"
-              >
-                <Download className="w-5 h-5 mr-2" />
-                Download
-              </Button>
-            </div>
+                <Button
+                  onClick={handleDownload}
+                  variant="outline"
+                  className="h-12"
+                >
+                  <Download className="w-5 h-5 mr-2" />
+                  Download
+                </Button>
+              </div>
 
             <div className="space-y-4">
               <div>
@@ -685,7 +1015,7 @@ const handleStatsUpdate = async (listenTime) => {
                 <CollapsibleContent className="mt-3">
                   <div className="bg-gray-50 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">Echo Effect</label>
+                      <label className="text-sm font-medium text-gray-700">Echo Effect ({echoCount === 0 ? 'Off' : `${echoCount * 4} instances`})</label>
                       <Button
                         size="sm"
                         variant={isConfigLocked ? "destructive" : "default"}
@@ -707,8 +1037,13 @@ const handleStatsUpdate = async (listenTime) => {
                         disabled={isConfigLocked || isPlaying}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                       />
-                      <span className="text-sm font-medium w-8">{echoCount}x</span>
+                      <span className="text-sm font-medium w-12">
+                        {echoCount === 0 ? 'Off' : `${echoCount}x`}
+                      </span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Echo creates up to 20 simultaneous audio instances with varying stereo positioning.
+                    </p>
                     {(isPlaying || isConfigLocked) && (
                       <p className="text-xs text-amber-600 mt-2">
                         Echo configuration cannot be changed while playing or when locked
@@ -732,7 +1067,7 @@ const handleStatsUpdate = async (listenTime) => {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Language:</p>
-                  <p className="font-medium">{sound.languages?.[0] || "Unknown"}</p>
+                  <p className="font-medium">{sound.languages?.[0] || sound.language || "Unknown"}</p>
                 </div>
               </div>
               

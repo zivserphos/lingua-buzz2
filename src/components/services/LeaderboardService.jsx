@@ -35,9 +35,31 @@ export const fetchLeaderboard = async (sortBy = 'total_listen_time', period = 'a
   }
 };
 
-export const updateUserStats = async (listenTime, soundsPlayed = 1, soundId = null) => {
+/**
+ * Update user activity statistics and track achievements
+ * @param {number} listenTime - Time listened in seconds
+ * @param {number} soundsPlayed - Number of sounds played (default: 1)
+ * @param {string|null} soundId - Unique ID of the sound played (for collection achievements)
+ * @param {Object} options - Additional tracking options for achievements
+ * @param {string} [options.effectUsed] - Audio effect being used (for feature-based achievements)
+ * @param {number} [options.sessionDuration] - Duration of current session in seconds
+ * @param {boolean} [options.isNightTime] - Whether this activity is happening at night
+ * @returns {Promise<Object>} The result of the API call
+ */
+export const updateUserStats = async (
+  listenTime, 
+  soundsPlayed = 1, 
+  soundId = null, 
+  options = {}
+) => {
   const token = localStorage.getItem('access_token');
   if (!token) throw new Error('Authentication required');
+  
+  // Default night time detection if not explicitly provided 
+  if (options.isNightTime === undefined) {
+    const currentHour = new Date().getHours();
+    options.isNightTime = (currentHour >= 22 || currentHour <= 5);
+  }
   
   try {
     const response = await fetch(UPDATE_STATS_URL, {
@@ -49,7 +71,11 @@ export const updateUserStats = async (listenTime, soundsPlayed = 1, soundId = nu
       body: JSON.stringify({
         listenTime,
         soundsPlayed,
-        soundId
+        soundId,
+        // Add new achievement parameters
+        effectUsed: options.effectUsed,
+        sessionDuration: options.sessionDuration,
+        isNightTime: options.isNightTime
       })
     });
     

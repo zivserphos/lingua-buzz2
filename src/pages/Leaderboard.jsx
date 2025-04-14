@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from "react";
-import { Crown, Clock, Trophy, ArrowLeft, Music, Medal, Award } from "lucide-react";
+import { Crown, Clock, Trophy, ArrowLeft, Music, Medal, Award, Star } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import LeaderboardService from "@/components/services/LeaderboardService";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState("all_time");
@@ -16,6 +15,15 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState([]);
+
+  // Achievement tier styling
+  const TIER_COLORS = {
+    bronze: "bg-amber-100 text-amber-800 border-amber-200",
+    silver: "bg-slate-100 text-slate-800 border-slate-200",
+    gold: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    platinum: "bg-cyan-100 text-cyan-800 border-cyan-200",
+    diamond: "bg-violet-100 text-violet-800 border-violet-200"
+  };
 
   const fetchLeaderboardDirectly = async (sortBy = 'total_listen_time', period = 'all_time', limit = 10) => {
     const LEADERBOARD_URL = 'https://getleaderboard-stbfcg576q-uc.a.run.app';
@@ -257,15 +265,45 @@ export default function LeaderboardPage() {
                         </div>
                       </div>
 
+                      {/* Updated achievements section to handle both string and object formats */}
                       <div className="flex flex-wrap gap-2 mt-4">
-                        {(leader.achievements || []).map((achievement, i) => (
-                          <span
-                            key={i}
-                            className="px-3 py-1 rounded-full text-sm bg-white/50 text-gray-700"
-                          >
-                            {achievement}
-                          </span>
-                        ))}
+                        <TooltipProvider>
+                          {(leader.achievements || []).map((achievement, i) => {
+                            // Handle both string format (old) and object format (new)
+                            if (typeof achievement === 'string') {
+                              return (
+                                <span
+                                  key={i}
+                                  className="px-3 py-1 rounded-full text-sm bg-white/50 text-gray-700"
+                                >
+                                  {achievement}
+                                </span>
+                              );
+                            }
+                            
+                            // Handle object format (new system)
+                            const { id, name, description, tier } = achievement;
+                            
+                            return (
+                              <Tooltip key={id || i}>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className={`px-3 py-1 rounded-full text-sm border 
+                                      flex items-center gap-1 ${TIER_COLORS[tier] || 'bg-white/50 text-gray-700'}`}
+                                  >
+                                    {tier === 'gold' || tier === 'diamond' ? 
+                                      <Star className="w-3 h-3" /> : null}
+                                    {name}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{description}</p>
+                                  <p className="text-xs mt-1 font-medium capitalize">{tier} tier</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </TooltipProvider>
                       </div>
                     </div>
                   </div>
