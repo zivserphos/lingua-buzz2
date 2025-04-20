@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import LanguageSelector from "../components/sounds/LanguageSelector";
 import SoundCard from "../components/sounds/SoundCard";
@@ -11,7 +10,6 @@ import { LogIn, LogOut, Trophy, Loader2, User, X, Save, UserCheck, Star } from "
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { debounce } from 'lodash';
@@ -96,82 +94,87 @@ export default function SoundsPage() {
   // Guest auth dialog
   const [showGuestDialog, setShowGuestDialog] = useState(false);
   const [guestUsername, setGuestUsername] = useState("");
+
+  const isRefreshing = useRef(false);
+  const isMounted = useRef(true);
   
   // Refs for intersection observer
   const loadingIndicatorRef = useRef(null);
   const observerRef = useRef(null);
   
   const initializedAds = useRef(new Set());
+
+  // Load AdSense ads
   useEffect(() => {
-  if (typeof window === 'undefined') return;
-  
-  // Skip if already running
-  if (window._adSenseInitializing) return;
-  window._adSenseInitializing = true;
-  
-  // Load the AdSense script once
-  const loadAdSenseScript = () => {
-    return new Promise((resolve) => {
-      // Check if script already exists
-      if (document.querySelector('script[src*="adsbygoogle.js"]')) {
-        resolve();
-        return;
+    if (typeof window === 'undefined') return;
+    
+    // Skip if already running
+    if (window._adSenseInitializing) return;
+    window._adSenseInitializing = true;
+    
+    // Load the AdSense script once
+    const loadAdSenseScript = () => {
+      return new Promise((resolve) => {
+        // Check if script already exists
+        if (document.querySelector('script[src*="adsbygoogle.js"]')) {
+          resolve();
+          return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7696906136083035';
+        script.async = true;
+        script.crossOrigin = 'anonymous';
+        script.onload = resolve;
+        document.head.appendChild(script);
+      });
+    };
+    
+    // Function to initialize a single ad
+    const initializeAd = (adId) => {
+      if (!adId || initializedAds.current.has(adId)) return;
+      
+      const adElement = document.getElementById(adId);
+      if (!adElement) return;
+      
+      try {
+        console.log(`Initializing ad: ${adId}`);
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        initializedAds.current.add(adId);
+      } catch (err) {
+        console.error(`Failed to initialize ad ${adId}:`, err);
       }
+    };
+    
+    // Main initialization function
+    const initializeAds = async () => {
+      await loadAdSenseScript();
       
-      const script = document.createElement('script');
-      script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7696906136083035';
-      script.async = true;
-      script.crossOrigin = 'anonymous';
-      script.onload = resolve;
-      document.head.appendChild(script);
-    });
-  };
-  
-  // Function to initialize a single ad
-  const initializeAd = (adId) => {
-    if (!adId || initializedAds.current.has(adId)) return;
+      // Wait a bit to ensure DOM is ready
+      setTimeout(() => {
+        // Initialize each ad separately
+        initializeAd(AD_IDS.LEFT);
+        initializeAd(AD_IDS.RIGHT);
+        initializeAd(AD_IDS.BOTTOM);
+        
+        // Clean up initialization flag
+        window._adSenseInitializing = false;
+      }, 100);
+    };
     
-    const adElement = document.getElementById(adId);
-    if (!adElement) return;
-    
-    try {
-      console.log(`Initializing ad: ${adId}`);
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-      initializedAds.current.add(adId);
-    } catch (err) {
-      console.error(`Failed to initialize ad ${adId}:`, err);
+    // Initialize immediately if document is ready
+    if (document.readyState === 'complete') {
+      initializeAds();
+    } else {
+      // Otherwise wait for the load event
+      window.addEventListener('load', initializeAds);
     }
-  };
-  
-  // Main initialization function
-  const initializeAds = async () => {
-    await loadAdSenseScript();
     
-    // Wait a bit to ensure DOM is ready
-    setTimeout(() => {
-      // Initialize each ad separately
-      initializeAd(AD_IDS.LEFT);
-      initializeAd(AD_IDS.RIGHT);
-      initializeAd(AD_IDS.BOTTOM);
-      
-      // Clean up initialization flag
+    return () => {
+      window.removeEventListener('load', initializeAds);
       window._adSenseInitializing = false;
-    }, 100);
-  };
-  
-  // Initialize immediately if document is ready
-  if (document.readyState === 'complete') {
-    initializeAds();
-  } else {
-    // Otherwise wait for the load event
-    window.addEventListener('load', initializeAds);
-  }
-  
-  return () => {
-    window.removeEventListener('load', initializeAds);
-    window._adSenseInitializing = false;
-  };
-}, []);
+    };
+  }, []);
   
   // Function to decode JWT token and extract user information
   const decodeToken = (token) => {
@@ -254,7 +257,7 @@ export default function SoundsPage() {
   
   // Initialize Firebase on component mount with refresh token logic
   useEffect(() => {
-    let cleanup = false;
+    isMounted.current = true;
     
     const initFirebase = async () => {
       try {
@@ -277,17 +280,19 @@ export default function SoundsPage() {
         // Wait for scripts to load
         firebaseAppScript.onload = () => {
           firebaseAuthScript.onload = () => {
-            if (!cleanup) setupAuth();
+            if (isMounted.current) setupAuth();
           };
         };
       } catch (error) {
         console.error("Firebase initialization error:", error);
-        setAuthLoading(false);
-        
-        // Even if Firebase fails, try to create anonymous guest
-        createAnonymousGuest().then(success => {
+        if (isMounted.current) {
           setAuthLoading(false);
-        });
+          
+          // Even if Firebase fails, try to create anonymous guest
+          createAnonymousGuest().then(success => {
+            if (isMounted.current) setAuthLoading(false);
+          });
+        }
       }
     };
     
@@ -303,45 +308,49 @@ export default function SoundsPage() {
       
       // If we have an access token, use it directly
       if (accessToken) {
-        setIdToken(accessToken);
-        setIsAnonymousGuest(isAnonymous);
-        
-        // Try to decode the token to get user info
-        const payload = decodeToken(accessToken);
-        if (payload) {
-          setUser({
-            uid: payload.user_id || payload.sub,
-            email: payload.email,
-            role: isAnonymous ? 'anonymous_guest' : 'user'
-          });
+        if (isMounted.current) {
+          setIdToken(accessToken);
+          setIsAnonymousGuest(isAnonymous);
+          
+          // Try to decode the token to get user info
+          const payload = decodeToken(accessToken);
+          if (payload) {
+            setUser({
+              uid: payload.user_id || payload.sub,
+              email: payload.email,
+              role: isAnonymous ? 'anonymous_guest' : 'user'
+            });
+          }
+          
+          // If this is an anonymous guest, show the auth banner
+          if (isAnonymous) {
+            setTimeout(() => {
+              if (isMounted.current) setShowAuthBanner(true);
+            }, 1000);
+          }
+          
+          setAuthLoading(false);
         }
-        
-        // If this is an anonymous guest, show the auth banner
-        if (isAnonymous) {
-          setTimeout(() => setShowAuthBanner(true), 1000);
-        }
-        
-        setAuthLoading(false);
       } 
       // If we have a refresh token but no access token, refresh it
       else if (refreshToken) {
         const success = await refreshAccessToken(refreshToken);
-        if (!success) {
+        if (!success && isMounted.current) {
           // If refresh failed, create anonymous guest
           await createAnonymousGuest();
         }
-        setAuthLoading(false);
+        if (isMounted.current) setAuthLoading(false);
       } 
       // No tokens, create anonymous guest
       else {
         await createAnonymousGuest();
-        setAuthLoading(false);
+        if (isMounted.current) setAuthLoading(false);
       }
       
       // Set up auth state listener for new sign-ins
       const auth = window.firebase.auth();
-      auth.onAuthStateChanged(async (currentUser) => {
-        if (currentUser) {
+      const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
+        if (currentUser && isMounted.current) {
           try {
             const token = await currentUser.getIdToken();
             setIdToken(token);
@@ -350,50 +359,46 @@ export default function SoundsPage() {
             setIsAnonymousGuest(false);
             
             setUser(currentUser);
-            
-            // Set up token refresh every 30 minutes
-            const tokenRefreshInterval = setInterval(async () => {
-              try {
-                const refreshedToken = await currentUser.getIdToken(true);
-                setIdToken(refreshedToken);
-                localStorage.setItem('access_token', refreshedToken);
-              } catch (error) {
-                console.error('Token refresh error:', error);
-              }
-            }, 30 * 60 * 1000);
-            
-            return () => clearInterval(tokenRefreshInterval);
           } catch (error) {
             console.error('Error getting token:', error);
           }
         }
       });
+      
+      return () => {
+        unsubscribe();
+      };
     };
     
     initFirebase();
     
     return () => {
-      cleanup = true;
+      isMounted.current = false;
     };
   }, []);
+
+  // IMPROVED: Debounced search that ensures it has a token
+  const debouncedSearch = useCallback(
+    debounce(() => {
+      if (idToken) {
+        fetchSounds(true);
+      }
+    }, 500),
+    [searchTerm, language, idToken]
+  );
   
-  // Set up intersection observer for infinite scroll
   useEffect(() => {
-    if (loadingIndicatorRef.current && hasNextPage) {
-      setupIntersectionObserver();
+    if (idToken) {
+      debouncedSearch();
     }
     
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [hasNextPage, loading]);
+    return () => debouncedSearch.cancel();
+  }, [searchTerm, debouncedSearch]);
   
   // Load sounds when user is authenticated
   useEffect(() => {
-    if (idToken) {
-      resetAndFetchSounds();
+    if (idToken && (!sounds.length || sounds.length === 0)) {
+      fetchSounds(true);
     } else if (!authLoading) {
       setInitialLoading(false);
     }
@@ -402,95 +407,78 @@ export default function SoundsPage() {
   // Handle language change
   useEffect(() => {
     if (idToken && !initialLoading) {
-      resetAndFetchSounds();
+      fetchSounds(true);
     }
   }, [language]);
   
-  // Set up intersection observer for infinite loading
-  const setupIntersectionObserver = () => {
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    if (!loadingIndicatorRef.current || !hasNextPage) return;
     
-    observerRef.current = new IntersectionObserver((entries) => {
+    const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasNextPage && !loading) {
-        fetchSounds();
+        fetchSounds(false);
       }
     }, { rootMargin: '200px' });
     
-    observerRef.current.observe(loadingIndicatorRef.current);
-  };
-  
-  // Reset pagination and fetch sounds
-  const resetAndFetchSounds = () => {
-    setSounds([]);
-    setCurrentPage(1);
-    setHasNextPage(false);
-    setTotalPages(0);
-    setTotalItems(0);
-    fetchSounds(true);
-  };
-
-  // Fetch sounds from Firebase API
-  const fetchSounds = async (isReset = false, retryCount = 0) => {
-    // Check if already loading or missing token
-    if (loading || !idToken) return;
+    observer.observe(loadingIndicatorRef.current);
     
-    // Check for too many retry attempts (prevent infinite loops)
-    if (retryCount > 2) {
-      setError("Too many failed attempts. Please reload the page.");
-      setLoading(false);
-      return;
+    return () => observer.disconnect();
+  }, [hasNextPage, loading]);
+  
+  // CORE FUNCTIONALITY: Fetch sounds - simplified and robust
+  const fetchSounds = async (isReset = false) => {
+    // Prevent duplicate requests
+    if (loading) return;
+    
+    // Reset pagination for new searches
+    if (isReset) {
+      setSounds([]);
+      setCurrentPage(1);
     }
     
     const page = isReset ? 1 : currentPage;
     setLoading(true);
     
-    try {
-      // First check if token will expire soon (within 5 minutes)
-      const tokenPayload = decodeToken(idToken);
-      if (tokenPayload && tokenPayload.exp) {
-        const expirationTime = tokenPayload.exp * 1000; // Convert to milliseconds
-        const currentTime = Date.now();
-        const timeToExpiration = expirationTime - currentTime;
-        
-        // Proactively refresh token if it expires in less than 5 minutes
-        if (timeToExpiration < 5 * 60 * 1000) {
-          console.log("Token expiring soon, refreshing proactively...");
-          const refreshToken = localStorage.getItem('refresh_token');
-          if (refreshToken) {
-            const success = await refreshAccessToken(refreshToken);
-            if (!success) {
-              throw new Error('Token refresh failed. Please login again.');
-            }
-            // If we successfully refreshed the token, we can continue with the request
-          }
-        }
+    // Add timeout to prevent stuck loading state
+    const timeoutId = setTimeout(() => {
+      console.log("⚠️ API request timed out after 15 seconds");
+      if (isMounted.current) {
+        setLoading(false);
+        setInitialLoading(false);
       }
+    }, 15000);
+    
+    try {
+      console.log(`Fetching sounds: page=${page}, language=${language}, search="${searchTerm || ""}"`);
       
-      // Proceed with request
+      // Get current token
+      const accessToken = localStorage.getItem('access_token') || idToken;
+      
+      // CRITICAL FIX: Always use a valid language
+      const currentLanguage = language || "English";
+      
       const requestBody = {
-        language,
+        language: currentLanguage,
         limit: 20,
         page,
-        ...(searchTerm && { search: searchTerm })
+        ...(searchTerm && searchTerm.trim() !== "" ? { search: searchTerm } : {})
       };
       
-      console.log(`Fetching sounds: page ${page}, language ${language}, search: "${searchTerm}"`);
-      
-      const accessToken = localStorage.getItem('access_token');
       const response = await fetch(
         'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+            'Authorization': `Bearer ${accessToken}`
           },
           body: JSON.stringify(requestBody)
         }
       );
-
+      
+      clearTimeout(timeoutId);
+      
       // Handle unauthorized error (401)
       if (response.status === 401) {
         console.log("Unauthorized (401). Attempting token refresh...");
@@ -501,76 +489,92 @@ export default function SoundsPage() {
           
           if (refreshSuccess) {
             console.log("Token refreshed successfully, retrying request...");
-            // Add a slight delay before retrying to prevent rapid requests
+            // Add a delay before retrying to prevent rapid requests
             await new Promise(resolve => setTimeout(resolve, 1000));
             
-            // Retry with incremented retry counter
-            setLoading(false);
-            return fetchSounds(isReset, retryCount + 1);
+            // Retry with fresh token
+            if (isMounted.current) {
+              setLoading(false);
+              fetchSounds(isReset);
+            }
+            return;
           } else {
-            // If token refresh failed, don't retry automatically
             throw new Error('Authentication failed. Please sign in again.');
           }
         } else {
           throw new Error('Not authenticated. Please login.');
         }
       }
-
-      // Handle other errors
+      
       if (!response.ok) {
-        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        throw new Error(`Server error: ${response.status}`);
       }
-
-      // Parse response
+      
       const data = await response.json();
       
-      if (!data.result?.success) {
-        throw new Error(data.result?.message || 'Invalid response format');
+      if (!data || !data.result || !data.result.success) {
+        throw new Error('Invalid API response');
       }
-
+      
       const newSounds = data.result.data || [];
+      console.log(`Got ${newSounds.length} sounds`);
       
-      // Preserve the sounds' saved state from the API response
-      setSounds(prev => isReset ? newSounds : [...prev, ...newSounds.map(sound => ({
-        ...sound,
-        isSaved: sound.isSaved || false, // Ensure isSaved is always defined
-        hastags: sound.hastags || [] // Ensure hastags is always defined
-      }))]);
-      
-      setHasNextPage(data.result.pagination.hasNextPage);
-      setTotalPages(data.result.pagination.totalPages);
-      setTotalItems(data.result.pagination.totalItems);
-      setCurrentPage(page + 1);
-      setError(null);
-
+      if (isMounted.current) {
+        setSounds(prev => isReset ? newSounds : [...prev, ...newSounds]);
+        setHasNextPage(data.result.pagination.hasNextPage);
+        setTotalPages(data.result.pagination.totalPages);
+        setTotalItems(data.result.pagination.totalItems);
+        setCurrentPage(page + 1);
+        setError(null);
+      }
     } catch (error) {
       console.error('Error fetching sounds:', error);
-      setError(error.message);
       
-      // If the error is related to authentication but not handled above,
-      // create a new anonymous guest if needed
-      if (error.message.includes('authentication') || error.message.includes('login')) {
-        if (!isAnonymousGuest) {
-          console.log("Authentication error, creating anonymous guest...");
-          // Only try to create guest after a delay to prevent loops
-          setTimeout(() => {
-            createAnonymousGuest();
-          }, 2000);
-        }
+      // If there was a network or server error, retry after a delay
+      if (error.message.includes('network') || error.message.includes('server')) {
+        console.log("Retrying after network/server error");
+        setTimeout(() => {
+          if (isMounted.current) {
+            setLoading(false);
+            fetchSounds(isReset);
+          }
+        }, 2000);
+        return;
+      }
+      
+      if (isMounted.current) {
+        setError(`Could not load sounds: ${error.message}`);
       }
     } finally {
-      setLoading(false);
-      setInitialLoading(false);
+      clearTimeout(timeoutId);
+      if (isMounted.current) {
+        setLoading(false);
+        setInitialLoading(false);
+      }
     }
   };
 
   const refreshAccessToken = async (refreshToken = null) => {
+    if (isRefreshing.current) {
+      console.log("Token refresh already in progress, waiting...");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      if (localStorage.getItem('access_token')) {
+        return true; // Another refresh succeeded while we were waiting
+      }
+      
+      return false;
+    }
+    
+    isRefreshing.current = true;
+
     try {
       const token = refreshToken || localStorage.getItem('refresh_token');
       if (!token) {
-        throw new Error('No refresh token available');
+        console.error('No refresh token available');
+        return false;
       }
-
+  
       console.log("Refreshing access token...");
       
       const response = await fetch(
@@ -586,17 +590,20 @@ export default function SoundsPage() {
           })
         }
       );
-
+  
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Token refresh failed with status:', response.status, errorData);
         throw new Error(`Failed to refresh token: ${response.status}`);
       }
-
+  
       const data = await response.json();
-
+  
       if (!data.id_token) {
+        console.error('Token refresh response missing id_token:', data);
         throw new Error('Token refresh response missing id_token');
       }
-
+  
       // Update tokens in localStorage
       localStorage.setItem('access_token', data.id_token);
       if (data.refresh_token) {
@@ -604,16 +611,18 @@ export default function SoundsPage() {
       }
       
       // Update state
-      setIdToken(data.id_token);
-      
-      // Update user info from token
-      const payload = decodeToken(data.id_token);
-      if (payload) {
-        setUser({
-          uid: payload.user_id || payload.sub,
-          email: payload.email,
-          role: localStorage.getItem('is_anonymous_guest') === 'true' ? 'anonymous_guest' : 'user'
-        });
+      if (isMounted.current) {
+        setIdToken(data.id_token);
+        
+        // Update user info from token
+        const payload = decodeToken(data.id_token);
+        if (payload) {
+          setUser({
+            uid: payload.user_id || payload.sub,
+            email: payload.email,
+            role: localStorage.getItem('is_anonymous_guest') === 'true' ? 'anonymous_guest' : 'user'
+          });
+        }
       }
       
       console.log("Token refresh successful");
@@ -625,11 +634,16 @@ export default function SoundsPage() {
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('is_anonymous_guest');
-        setUser(null);
-        setIdToken(null);
-        setIsAnonymousGuest(false);
+        if (isMounted.current) {
+          setUser(null);
+          setIdToken(null);
+          setIsAnonymousGuest(false);
+        }
       }
       return false;
+    }
+    finally {
+      isRefreshing.current = false;
     }
   };
 
@@ -704,13 +718,20 @@ export default function SoundsPage() {
     }
   };
 
-  // Handle search
+  // Handle search input
   const handleSearchInput = (value) => {
     setSearchTerm(value);
   };
 
   // Handle language change
   const handleLanguageChange = (newLanguage) => {
+    console.log("Language changed from", language, "to", newLanguage);
+    
+    // CRITICAL: Ensure we have a valid language
+    if (!newLanguage || newLanguage.trim() === "") {
+      newLanguage = "English";
+    }
+    
     setLanguage(newLanguage);
   };
 
@@ -879,18 +900,10 @@ export default function SoundsPage() {
     }
   };
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      resetAndFetchSounds();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       {/* BOTTOM FIXED AD - Easy to comment out during development */}
-      <BottomFixedAd style={{ height: '90px', marginTop: '30px' }} />
+      <BottomFixedAd />
       {/* END BOTTOM FIXED AD */}
       
       <div className="max-w-[1600px] mx-auto px-4 py-8">
@@ -1045,7 +1058,7 @@ export default function SoundsPage() {
             <Search 
               value={searchTerm} 
               onChange={handleSearchInput} 
-              onSearch={resetAndFetchSounds}
+              onSearch={() => fetchSounds(true)}
             />
           </div>
           <LanguageSelector 
@@ -1057,12 +1070,34 @@ export default function SoundsPage() {
         {error && (
           <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6">
             {error}
+            <Button 
+              className="ml-4" 
+              variant="outline" 
+              onClick={() => fetchSounds(true)}
+            >
+              Try Again
+            </Button>
           </div>
         )}
 
         {initialLoading ? (
-          <div className="flex justify-center items-center min-h-[300px]">
-            <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
+          <div className="flex flex-col justify-center items-center min-h-[300px]">
+            <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
+            <p className="text-sm text-gray-500 mb-2">Loading sounds...</p>
+            {/* Show reset button if loading takes too long */}
+            <Button 
+              onClick={() => {
+                console.log("Manual reset triggered");
+                setInitialLoading(false);
+                setLoading(false);
+                setTimeout(() => fetchSounds(true), 500);
+              }}
+              variant="outline"
+              size="sm"
+              className="mt-4"
+            >
+              Reset Loading
+            </Button>
           </div>
         ) : (
           <div className="flex">
