@@ -20,7 +20,8 @@ export default function useSoundsData(idToken) {
   const isMounted = useRef(true);
   const restoredStateRef = useRef(false);
   const tokenRefreshInProgress = useRef(false);
-  const retryAttempts = useRef(0); // Add this to track retries
+  const retryAttempts = useRef(0);
+  const lastSearchTerm = useRef("");
 
   // Function to refresh the access token
   const refreshAccessToken = async (refreshToken) => {
@@ -64,7 +65,7 @@ export default function useSoundsData(idToken) {
       }
       
       console.log("Token refresh successful");
-      retryAttempts.current = 0; // Reset retry counter on success
+      retryAttempts.current = 0;
       return data.id_token;
     } catch (error) {
       console.error('Error refreshing token:', error);
@@ -74,10 +75,10 @@ export default function useSoundsData(idToken) {
     }
   };
 
-  // CORE FUNCTIONALITY: Fetch sounds - improved with better authentication handling
-  const fetchSounds = async (isReset = false, retryCount = 0) => {
-    // CRITICAL FIX: Prevent infinite retry loops
-    if (retryCount > 2) { // Maximum 3 attempts (original + 2 retries)
+  // CORE FUNCTIONALITY: Fetch sounds with improved search handling
+  const fetchSounds = useCallback(async (isReset = false, retryCount = 0) => {
+    // Prevent infinite retry loops
+    if (retryCount > 2) {
       console.error("Too many retry attempts, giving up.");
       setError("Authentication failed. Please try signing in again.");
       setLoading(false);
@@ -107,6 +108,10 @@ export default function useSoundsData(idToken) {
     }, 15000);
     
     try {
+      // Save the current search term to compare later
+      lastSearchTerm.current = searchTerm;
+      
+      // Log what we're searching for
       console.log(`Fetching sounds: page=${page}, language=${language}, search="${searchTerm || ""}" (retry: ${retryCount})`);
       
       // Get current token - try props first, then localStorage
@@ -116,15 +121,20 @@ export default function useSoundsData(idToken) {
         throw new Error('No authentication token available');
       }
       
-      // CRITICAL FIX: Always use a valid language
+      // Always use a valid language
       const currentLanguage = language || "English";
       
+      // Create request body - IMPORTANT: Only include search param if it has value
       const requestBody = {
         language: currentLanguage,
         limit: 20,
-        page,
-        ...(searchTerm && searchTerm.trim() !== "" ? { search: searchTerm } : {})
+        page
       };
+      
+      // Only add search term if it's not empty
+      if (searchTerm && searchTerm.trim() !== "") {
+        requestBody.search = searchTerm.trim();
+      }
       
       const response = await fetch(
         'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
@@ -150,7 +160,6 @@ export default function useSoundsData(idToken) {
           const newToken = await refreshAccessToken(refreshToken);
           if (newToken) {
             console.log("Token refreshed, retrying request...");
-            // IMPORTANT FIX: Increment retry count to prevent infinite loops
             return fetchSounds(isReset, retryCount + 1);
           }
         }
@@ -175,21 +184,24 @@ export default function useSoundsData(idToken) {
       // Reset retry counter on success
       retryAttempts.current = 0;
       
-      if (isMounted.current) {
+      // Check if search term is still the same (user might have typed more while request was in flight)
+      if (isMounted.current && lastSearchTerm.current === searchTerm) {
         setSounds(prev => isReset ? newSounds : [...prev, ...newSounds]);
         setHasNextPage(data.result.pagination.hasNextPage);
         setTotalPages(data.result.pagination.totalPages);
         setTotalItems(data.result.pagination.totalItems);
         setCurrentPage(page + 1);
         setError(null);
+        
+        // Save the state for future return visits
+        saveSoundsState(
+          isReset ? newSounds : [...(isReset ? [] : sounds), ...newSounds], 
+          page + 1, 
+          data.result.pagination
+        );
+      } else {
+        console.log("Search term changed while request was in flight, discarding results");
       }
-      
-      // Save the state for future return visits
-      saveSoundsState(
-        isReset ? newSounds : [...sounds, ...newSounds], 
-        page + 1, 
-        data.result.pagination
-      );
     } catch (error) {
       console.error('Error fetching sounds:', error);
       
@@ -209,7 +221,7 @@ export default function useSoundsData(idToken) {
         setInitialLoading(false);
       }
     }
-  };
+  }, [currentPage, idToken, language, loading, searchTerm, sounds]);
   
   // Save state to session storage for preserving between navigations
   const saveSoundsState = (currentSounds, page, pagination) => {
@@ -230,28 +242,41 @@ export default function useSoundsData(idToken) {
     sessionStorage.setItem('sounds_page_state', JSON.stringify(stateToSave));
   };
 
-  // IMPROVED: Debounced search with cancellation and error handling
+  // IMPROVED: Debounced search implementation
   const debouncedSearch = useCallback(
     debounce(() => {
-      // Only fetch if we have a valid token and no persistent error state
+      console.log(`Debounced search triggered with term: "${searchTerm}"`);
       if ((idToken || localStorage.getItem('access_token')) && 
           retryAttempts.current < 3) {
         fetchSounds(true);
       }
     }, 500),
-    [searchTerm, language, idToken]
+    [fetchSounds]
   );
   
-  // Handle search input
-  const handleSearchInput = (value) => {
+  // Handle explicit search button click or Enter key
+  const handleExplicitSearch = useCallback(() => {
+    if (idToken || localStorage.getItem('access_token')) {
+      console.log(`Explicit search triggered with term: "${searchTerm}"`);
+      // Cancel any pending debounced searches
+      debouncedSearch.cancel();
+      // Execute search immediately
+      fetchSounds(true);
+    }
+  }, [debouncedSearch, fetchSounds, idToken, searchTerm]);
+  
+  // Handle search input change
+  const handleSearchInput = useCallback((value) => {
+    console.log(`Search input changed to: "${value}"`);
     setSearchTerm(value);
-  };
+    // Debounced search will be triggered by the useEffect below
+  }, []);
 
   // Handle language change
-  const handleLanguageChange = (newLanguage) => {
+  const handleLanguageChange = useCallback((newLanguage) => {
     console.log("Language changed from", language, "to", newLanguage);
     
-    // CRITICAL: Ensure we have a valid language
+    // Ensure we have a valid language
     if (!newLanguage || newLanguage.trim() === "") {
       newLanguage = "English";
     }
@@ -259,16 +284,26 @@ export default function useSoundsData(idToken) {
     // Save language preference for return visits
     localStorage.setItem('preferred_language', newLanguage);
     setLanguage(newLanguage);
-  };
+    
+    // Language change will trigger a search via the useEffect
+  }, [language]);
 
-  // Effect for search debounce
+  // Effect for search debounce - triggers when searchTerm changes
   useEffect(() => {
-    if (idToken || localStorage.getItem('access_token')) {
+    if ((idToken || localStorage.getItem('access_token'))) {
+      // If search box is cleared, search immediately
+      if (searchTerm === "") {
+        debouncedSearch.cancel();
+        fetchSounds(true);
+        return;
+      }
+      
+      // Otherwise use debounce for better UX during typing
       debouncedSearch();
     }
     
     return () => debouncedSearch.cancel();
-  }, [searchTerm, language, debouncedSearch]);
+  }, [searchTerm, debouncedSearch, fetchSounds, idToken]);
   
   // Restore state effect
   useEffect(() => {
@@ -324,33 +359,35 @@ export default function useSoundsData(idToken) {
     if (token && !restoredStateRef.current && sounds.length === 0) {
       fetchSounds(true);
     }
-  }, [idToken]);
+  }, [idToken, fetchSounds, sounds.length]);
 
   // Handle language change
   useEffect(() => {
     const token = idToken || localStorage.getItem('access_token');
     if (token && !initialLoading && restoredStateRef.current) {
+      debouncedSearch.cancel();
       fetchSounds(true);
     }
-  }, [language]);
+  }, [language, debouncedSearch, fetchSounds, idToken, initialLoading]);
   
   // Reset error with a sign-in retry button
-  const resetError = () => {
+  const resetError = useCallback(() => {
     // Clear stored tokens to force re-login
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     retryAttempts.current = 0;
     setError(null);
     window.location.reload();
-  };
+  }, []);
   
   // Cleanup when unmounting
   useEffect(() => {
     isMounted.current = true;
     return () => {
       isMounted.current = false;
+      debouncedSearch.cancel();
     };
-  }, []);
+  }, [debouncedSearch]);
 
   return {
     sounds,
@@ -366,6 +403,7 @@ export default function useSoundsData(idToken) {
     fetchSounds,
     handleSearchInput,
     handleLanguageChange,
-    resetError // Add this function to allow users to try again
+    handleExplicitSearch, // New method for explicit search button click
+    resetError
   };
 }
