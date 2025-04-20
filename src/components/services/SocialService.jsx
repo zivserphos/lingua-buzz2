@@ -59,27 +59,67 @@ const SocialService = {
     return this.unlike('sound', soundId);
   },
   
-  async likeRingtone(ringtoneId) {
-    console.log('Using legacy likeRingtone method');
-    return this.like('ringtone', ringtoneId);
-  },
-  
-  async unlikeRingtone(ringtoneId) {
-    console.log('Using legacy unlikeRingtone method');
-    return this.unlike('ringtone', ringtoneId);
-  },
-  
-  async likeComment(commentId, soundId) {
-    console.log('Using legacy likeComment method');
-    return this.like('comment', commentId, soundId);
-  },
-  
-  async unlikeComment(commentId, soundId) {
-    console.log('Using legacy unlikeComment method');
-    return this.unlike('comment', commentId, soundId);
+  async saveSound(soundId) {
+    const token = localStorage.getItem('access_token');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${BASE_URL}savesound-stbfcg576q-uc.a.run.app`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        data: { soundId }
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to save sound');
+    return response.json();
   },
 
-  async getComments(soundId, page = 1, limit = 20) {
+  async unsaveSound(soundId) {
+    const token = localStorage.getItem('access_token');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${BASE_URL}unsavesound-stbfcg576q-uc.a.run.app`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        data: { soundId }
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to unsave sound');
+    return response.json();
+  },
+
+  async getSavedSounds(limit = 20, page = 1) {
+    const token = localStorage.getItem('access_token');
+    if (!token) throw new Error('Authentication required');
+
+    const response = await fetch(`${BASE_URL}getsavedsounds-stbfcg576q-uc.a.run.app`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        data: {
+          limit,
+          page
+        }
+      })
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch saved sounds');
+    return response.json();
+  },
+  
+  async getComments(soundId) {
     const token = localStorage.getItem('access_token');
     if (!token) throw new Error('Authentication required');
 
@@ -90,14 +130,16 @@ const SocialService = {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        data: { soundId, page, limit }
+        data: {
+          soundId
+        }
       })
     });
 
     if (!response.ok) throw new Error('Failed to fetch comments');
     return response.json();
   },
-
+  
   async addComment(soundId, text) {
     const token = localStorage.getItem('access_token');
     if (!token) throw new Error('Authentication required');
@@ -109,50 +151,14 @@ const SocialService = {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        data: { soundId, text }
+        data: {
+          soundId,
+          text
+        }
       })
     });
 
     if (!response.ok) throw new Error('Failed to add comment');
-    return response.json();
-  },
-
-  async getLikes(soundId, limit = 20) {
-    const token = localStorage.getItem('access_token');
-    if (!token) throw new Error('Authentication required');
-
-    const response = await fetch(`${BASE_URL}getlikes-stbfcg576q-uc.a.run.app`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        data: { soundId, limit }
-      })
-    });
-
-    if (!response.ok) throw new Error('Failed to fetch likes');
-    return response.json();
-  },
-  
-  // Helper method for ringtone likes if needed
-  async getRingtoneLikes(ringtoneId, limit = 20) {
-    const token = localStorage.getItem('access_token');
-    if (!token) throw new Error('Authentication required');
-
-    const response = await fetch(`${BASE_URL}getringtonelikes-stbfcg576q-uc.a.run.app`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        data: { ringtoneId, limit }
-      })
-    });
-
-    if (!response.ok) throw new Error('Failed to fetch ringtone likes');
     return response.json();
   }
 };

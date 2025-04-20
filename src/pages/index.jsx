@@ -2,12 +2,14 @@ import Layout from "./Layout.jsx";
 import Sounds from "./Sounds";
 import Leaderboard from "./Leaderboard";
 import MemeSound from "./MemeSound";
+import SavedSounds from "./SavedSounds";
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
     Sounds: Sounds,
     Leaderboard: Leaderboard,
     MemeSound: MemeSound,
+    SavedSounds: SavedSounds,
 }
 
 function _getCurrentPage(url) {
@@ -36,6 +38,8 @@ function PagesContent() {
                 <Route path="/sounds" element={<Sounds />} />
                 <Route path="/Leaderboard" element={<Leaderboard />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/SavedSounds" element={<SavedSounds />} />
+                <Route path="/savedsounds" element={<SavedSounds />} />
                 <Route path="/MemeSound" element={<MemeSound />} />
                 <Route path="/memesound" element={<MemeSound />} />
                 {/* Add case-insensitive routes for the name parameter */}

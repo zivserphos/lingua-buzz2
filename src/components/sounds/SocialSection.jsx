@@ -138,6 +138,7 @@ export default function SocialSection({ sound }) {
 
   const loadComments = async () => {
     try {
+      setLoading(true);
       const response = await SocialService.getComments(sound.id);
       // Update this line to correctly extract comments from the response
       const commentsData = response.result?.data?.comments || [];
@@ -156,6 +157,8 @@ export default function SocialSection({ sound }) {
     } catch (error) {
       console.error('Error loading comments:', error);
       setComments([]);
+    } finally {
+      setLoading(false);
     }
   };
 

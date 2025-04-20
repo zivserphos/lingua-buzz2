@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LogIn, LogOut, Trophy, Loader2, User, X, Save, UserCheck } from "lucide-react";
+import { LogIn, LogOut, Trophy, Loader2, User, X, Save, UserCheck, Star } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,51 @@ const firebaseConfig = {
   messagingSenderId: '622937397281',
   appId: '1:622937397281:ios:d4e34f90742f0ac7782b60',
 };
+
+const AD_IDS = {
+  LEFT: 'left-side-ad-' + Math.random().toString(36).substring(2, 9),
+  RIGHT: 'right-side-ad-' + Math.random().toString(36).substring(2, 9),
+  BOTTOM: 'bottom-fixed-ad-' + Math.random().toString(36).substring(2, 9)
+};
+
+const LeftSideAd = () => (
+  <div className="ad-container left-side-ad" style={{ width: '160px', height: '600px' }}>
+    <ins 
+      className="adsbygoogle"
+      id={AD_IDS.LEFT}
+      style={{display: 'block', width: '160px', height: '600px'}}
+      data-ad-client="ca-pub-7696906136083035"
+      data-ad-slot="1030502879"
+      data-ad-format="rectangle"
+      data-full-width-responsive="false" />
+  </div>
+);
+
+const RightSideAd = () => (
+  <div className="ad-container right-side-ad" style={{ width: '160px', height: '600px' }}>
+    <ins 
+      className="adsbygoogle"
+      id={AD_IDS.RIGHT}
+      style={{display: 'block', width: '160px', height: '600px'}}
+      data-ad-client="ca-pub-7696906136083035"
+      data-ad-slot="1007647680"
+      data-ad-format="rectangle"
+      data-full-width-responsive="false" />
+  </div>
+);
+
+const BottomFixedAd = () => (
+  <div className="ad-container bottom-fixed-ad" style={{ width: '100%', height: '90px' }}>
+    <ins 
+      className="adsbygoogle"
+      id={AD_IDS.BOTTOM}
+      style={{display: 'block', width: '100%', height: '90px'}}
+      data-ad-client="ca-pub-7696906136083035"
+      data-ad-slot="9912041236"
+      data-ad-format="horizontal"
+      data-full-width-responsive="true" />
+  </div>
+);
 
 export default function SoundsPage() {
   // Auth state
@@ -55,6 +100,78 @@ export default function SoundsPage() {
   // Refs for intersection observer
   const loadingIndicatorRef = useRef(null);
   const observerRef = useRef(null);
+  
+  const initializedAds = useRef(new Set());
+  useEffect(() => {
+  if (typeof window === 'undefined') return;
+  
+  // Skip if already running
+  if (window._adSenseInitializing) return;
+  window._adSenseInitializing = true;
+  
+  // Load the AdSense script once
+  const loadAdSenseScript = () => {
+    return new Promise((resolve) => {
+      // Check if script already exists
+      if (document.querySelector('script[src*="adsbygoogle.js"]')) {
+        resolve();
+        return;
+      }
+      
+      const script = document.createElement('script');
+      script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7696906136083035';
+      script.async = true;
+      script.crossOrigin = 'anonymous';
+      script.onload = resolve;
+      document.head.appendChild(script);
+    });
+  };
+  
+  // Function to initialize a single ad
+  const initializeAd = (adId) => {
+    if (!adId || initializedAds.current.has(adId)) return;
+    
+    const adElement = document.getElementById(adId);
+    if (!adElement) return;
+    
+    try {
+      console.log(`Initializing ad: ${adId}`);
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      initializedAds.current.add(adId);
+    } catch (err) {
+      console.error(`Failed to initialize ad ${adId}:`, err);
+    }
+  };
+  
+  // Main initialization function
+  const initializeAds = async () => {
+    await loadAdSenseScript();
+    
+    // Wait a bit to ensure DOM is ready
+    setTimeout(() => {
+      // Initialize each ad separately
+      initializeAd(AD_IDS.LEFT);
+      initializeAd(AD_IDS.RIGHT);
+      initializeAd(AD_IDS.BOTTOM);
+      
+      // Clean up initialization flag
+      window._adSenseInitializing = false;
+    }, 100);
+  };
+  
+  // Initialize immediately if document is ready
+  if (document.readyState === 'complete') {
+    initializeAds();
+  } else {
+    // Otherwise wait for the load event
+    window.addEventListener('load', initializeAds);
+  }
+  
+  return () => {
+    window.removeEventListener('load', initializeAds);
+    window._adSenseInitializing = false;
+  };
+}, []);
   
   // Function to decode JWT token and extract user information
   const decodeToken = (token) => {
@@ -315,134 +432,137 @@ export default function SoundsPage() {
   };
 
   // Fetch sounds from Firebase API
-
-const fetchSounds = async (isReset = false, retryCount = 0) => {
-  // Check if already loading or missing token
-  if (loading || !idToken) return;
-  
-  // Check for too many retry attempts (prevent infinite loops)
-  if (retryCount > 2) {
-    setError("Too many failed attempts. Please reload the page.");
-    setLoading(false);
-    return;
-  }
-  
-  const page = isReset ? 1 : currentPage;
-  setLoading(true);
-  
-  try {
-    // First check if token will expire soon (within 5 minutes)
-    const tokenPayload = decodeToken(idToken);
-    if (tokenPayload && tokenPayload.exp) {
-      const expirationTime = tokenPayload.exp * 1000; // Convert to milliseconds
-      const currentTime = Date.now();
-      const timeToExpiration = expirationTime - currentTime;
-      
-      // Proactively refresh token if it expires in less than 5 minutes
-      if (timeToExpiration < 5 * 60 * 1000) {
-        console.log("Token expiring soon, refreshing proactively...");
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const success = await refreshAccessToken(refreshToken);
-          if (!success) {
-            throw new Error('Token refresh failed. Please login again.');
-          }
-          // If we successfully refreshed the token, we can continue with the request
-        }
-      }
+  const fetchSounds = async (isReset = false, retryCount = 0) => {
+    // Check if already loading or missing token
+    if (loading || !idToken) return;
+    
+    // Check for too many retry attempts (prevent infinite loops)
+    if (retryCount > 2) {
+      setError("Too many failed attempts. Please reload the page.");
+      setLoading(false);
+      return;
     }
     
-    // Proceed with request
-    const requestBody = {
-      language,
-      limit: 20,
-      page,
-      ...(searchTerm && { search: searchTerm })
-    };
+    const page = isReset ? 1 : currentPage;
+    setLoading(true);
     
-    console.log(`Fetching sounds: page ${page}, language ${language}, search: "${searchTerm}"`);
-    
-    const response = await fetch(
-      'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify(requestBody)
-      }
-    );
-
-    // Handle unauthorized error (401)
-    if (response.status === 401) {
-      console.log("Unauthorized (401). Attempting token refresh...");
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      if (refreshToken) {
-        const refreshSuccess = await refreshAccessToken(refreshToken);
+    try {
+      // First check if token will expire soon (within 5 minutes)
+      const tokenPayload = decodeToken(idToken);
+      if (tokenPayload && tokenPayload.exp) {
+        const expirationTime = tokenPayload.exp * 1000; // Convert to milliseconds
+        const currentTime = Date.now();
+        const timeToExpiration = expirationTime - currentTime;
         
-        if (refreshSuccess) {
-          console.log("Token refreshed successfully, retrying request...");
-          // Add a slight delay before retrying to prevent rapid requests
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Retry with incremented retry counter
-          setLoading(false);
-          return fetchSounds(isReset, retryCount + 1);
-        } else {
-          // If token refresh failed, don't retry automatically
-          throw new Error('Authentication failed. Please sign in again.');
+        // Proactively refresh token if it expires in less than 5 minutes
+        if (timeToExpiration < 5 * 60 * 1000) {
+          console.log("Token expiring soon, refreshing proactively...");
+          const refreshToken = localStorage.getItem('refresh_token');
+          if (refreshToken) {
+            const success = await refreshAccessToken(refreshToken);
+            if (!success) {
+              throw new Error('Token refresh failed. Please login again.');
+            }
+            // If we successfully refreshed the token, we can continue with the request
+          }
         }
-      } else {
-        throw new Error('Not authenticated. Please login.');
       }
-    }
+      
+      // Proceed with request
+      const requestBody = {
+        language,
+        limit: 20,
+        page,
+        ...(searchTerm && { search: searchTerm })
+      };
+      
+      console.log(`Fetching sounds: page ${page}, language ${language}, search: "${searchTerm}"`);
+      
+      const accessToken = localStorage.getItem('access_token');
+      const response = await fetch(
+        'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
+          },
+          body: JSON.stringify(requestBody)
+        }
+      );
 
-    // Handle other errors
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status} ${response.statusText}`);
-    }
-
-    // Parse response
-    const data = await response.json();
-    
-    if (!data.result?.success) {
-      throw new Error(data.result?.message || 'Invalid response format');
-    }
-
-    // Successfully got data, update state
-    const newSounds = data.result.data || [];
-    
-    console.log(`Fetched ${newSounds.length} sounds. Has next page: ${data.result.pagination.hasNextPage}`);
-
-    setSounds(prev => isReset ? newSounds : [...prev, ...newSounds]);
-    setHasNextPage(data.result.pagination.hasNextPage);
-    setTotalPages(data.result.pagination.totalPages);
-    setTotalItems(data.result.pagination.totalItems);
-    setCurrentPage(page + 1);
-    setError(null);
-
-  } catch (error) {
-    console.error('Error fetching sounds:', error);
-    setError(error.message);
-    
-    // If the error is related to authentication but not handled above,
-    // create a new anonymous guest if needed
-    if (error.message.includes('authentication') || error.message.includes('login')) {
-      if (!isAnonymousGuest) {
-        console.log("Authentication error, creating anonymous guest...");
-        // Only try to create guest after a delay to prevent loops
-        setTimeout(() => {
-          createAnonymousGuest();
-        }, 2000);
+      // Handle unauthorized error (401)
+      if (response.status === 401) {
+        console.log("Unauthorized (401). Attempting token refresh...");
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        if (refreshToken) {
+          const refreshSuccess = await refreshAccessToken(refreshToken);
+          
+          if (refreshSuccess) {
+            console.log("Token refreshed successfully, retrying request...");
+            // Add a slight delay before retrying to prevent rapid requests
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Retry with incremented retry counter
+            setLoading(false);
+            return fetchSounds(isReset, retryCount + 1);
+          } else {
+            // If token refresh failed, don't retry automatically
+            throw new Error('Authentication failed. Please sign in again.');
+          }
+        } else {
+          throw new Error('Not authenticated. Please login.');
+        }
       }
+
+      // Handle other errors
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+
+      // Parse response
+      const data = await response.json();
+      
+      if (!data.result?.success) {
+        throw new Error(data.result?.message || 'Invalid response format');
+      }
+
+      const newSounds = data.result.data || [];
+      
+      // Preserve the sounds' saved state from the API response
+      setSounds(prev => isReset ? newSounds : [...prev, ...newSounds.map(sound => ({
+        ...sound,
+        isSaved: sound.isSaved || false, // Ensure isSaved is always defined
+        hastags: sound.hastags || [] // Ensure hastags is always defined
+      }))]);
+      
+      setHasNextPage(data.result.pagination.hasNextPage);
+      setTotalPages(data.result.pagination.totalPages);
+      setTotalItems(data.result.pagination.totalItems);
+      setCurrentPage(page + 1);
+      setError(null);
+
+    } catch (error) {
+      console.error('Error fetching sounds:', error);
+      setError(error.message);
+      
+      // If the error is related to authentication but not handled above,
+      // create a new anonymous guest if needed
+      if (error.message.includes('authentication') || error.message.includes('login')) {
+        if (!isAnonymousGuest) {
+          console.log("Authentication error, creating anonymous guest...");
+          // Only try to create guest after a delay to prevent loops
+          setTimeout(() => {
+            createAnonymousGuest();
+          }, 2000);
+        }
+      }
+    } finally {
+      setLoading(false);
+      setInitialLoading(false);
     }
-  } finally {
-    setLoading(false);
-    setInitialLoading(false);
-  }
-};
+  };
 
   const refreshAccessToken = async (refreshToken = null) => {
     try {
@@ -585,8 +705,8 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
   };
 
   // Handle search
-  const handleSearch = () => {
-    resetAndFetchSounds();
+  const handleSearchInput = (value) => {
+    setSearchTerm(value);
   };
 
   // Handle language change
@@ -759,25 +879,21 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
     }
   };
 
-  // Add debounced search function
-  const debouncedSearch = useCallback(
-    debounce((term) => {
-      if (term !== searchTerm) {
-        setSearchTerm(term);
-        resetAndFetchSounds();
-      }
-    }, 500),
-    [searchTerm, resetAndFetchSounds]
-  );
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      resetAndFetchSounds();
+    }, 500);
 
-  const handleSearchInput = (value) => {
-    setSearchTerm(value);
-    debouncedSearch(value);
-  };
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* BOTTOM FIXED AD - Easy to comment out during development */}
+      <BottomFixedAd style={{ height: '90px', marginTop: '30px' }} />
+      {/* END BOTTOM FIXED AD */}
+      
+      <div className="max-w-[1600px] mx-auto px-4 py-8">
         {/* Authentication banner for anonymous guests */}
         <AnimatePresence>
           {showAuthBanner && isAnonymousGuest && (
@@ -839,23 +955,43 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
 
           <div className="flex items-center gap-4">
             {user && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link to={createPageUrl("Leaderboard")}>
-                      <Button variant="outline" className="bg-white/50 backdrop-blur-sm">
-                        <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
-                        Leaderboard
-                      </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  {isAnonymousGuest && (
-                    <TooltipContent>
-                      <p>Sign in to track your achievements!</p>
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </TooltipProvider>
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to={createPageUrl("SavedSounds")}>
+                        <Button variant="outline" className="bg-white/50 backdrop-blur-sm">
+                          <Star className="w-5 h-5 mr-2 text-yellow-500" />
+                          Saved
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    {isAnonymousGuest && (
+                      <TooltipContent>
+                        <p>Sign in to save your favorite sounds!</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Link to={createPageUrl("Leaderboard")}>
+                        <Button variant="outline" className="bg-white/50 backdrop-blur-sm">
+                          <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
+                          Leaderboard
+                        </Button>
+                      </Link>
+                    </TooltipTrigger>
+                    {isAnonymousGuest && (
+                      <TooltipContent>
+                        <p>Sign in to track your achievements!</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
+              </>
             )}
 
             {!isAnonymousGuest && user ? (
@@ -929,47 +1065,59 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
             <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
           </div>
         ) : (
-          <>
-            {totalItems > 0 && (
-              <div className="text-center text-gray-500 mb-4">
-                Showing {sounds.length} of {totalItems} sounds
-              </div>
-            )}
-
-            <motion.div 
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              {sounds.map(sound => (
-                <SoundCard 
-                  key={sound.id} 
-                  sound={sound}
-                  isAnonymousGuest={isAnonymousGuest}
-                  onInteraction={isAnonymousGuest ? () => setShowAuthBanner(true) : undefined}
-                />
-              ))}
-            </motion.div>
-
-            {sounds.length === 0 && !loading && !initialLoading && (
-              <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">No sounds found 😢</p>
-                <p className="text-gray-400">Try changing your search or language</p>
-              </div>
-            )}
-
-            {/* Loading indicator for infinite scroll */}
-            <div 
-              ref={loadingIndicatorRef} 
-              className="flex justify-center mt-8 mb-4 h-10"
-            >
-              {loading && <Loader2 className="w-8 h-8 animate-spin text-purple-600" />}
+          <div className="flex">
+            {/* LEFT SIDE AD - Fixed position */}
+            <div className="hidden xl:block fixed left-0 top-1/2 transform -translate-y-1/2 ml-4" style={{ width: '160px', zIndex: 40 }}>
+              <LeftSideAd />
             </div>
-          </>
+            
+            <div className="flex-1 max-w-full">
+              {totalItems > 0 && (
+                <div className="text-center text-gray-500 mb-4">
+                  Showing {sounds.length} of {totalItems} sounds
+                </div>
+              )}
+
+              <motion.div 
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                {sounds.map(sound => (
+                  <SoundCard 
+                    key={sound.id} 
+                    sound={sound}
+                    isAnonymousGuest={isAnonymousGuest}
+                    onInteraction={isAnonymousGuest ? () => setShowAuthBanner(true) : undefined}
+                  />
+                ))}
+              </motion.div>
+
+              {sounds.length === 0 && !loading && !initialLoading && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 text-lg">No sounds found 😢</p>
+                  <p className="text-gray-400">Try changing your search or language</p>
+                </div>
+              )}
+
+              {/* Loading indicator for infinite scroll */}
+              <div 
+                ref={loadingIndicatorRef} 
+                className="flex justify-center mt-8 mb-4 h-10"
+              >
+                {loading && <Loader2 className="w-8 h-8 animate-spin text-purple-600" />}
+              </div>
+            </div>
+            
+            {/* RIGHT SIDE AD - Fixed position */}
+            <div className="hidden xl:block fixed right-0 top-1/2 transform -translate-y-1/2 mr-4" style={{ width: '160px', zIndex: 40 }}>
+              <RightSideAd />
+            </div>
+          </div>
         )}
       </div>
-      
+
       {/* Guest Username Dialog */}
       <Dialog open={showGuestDialog} onOpenChange={setShowGuestDialog}>
         <DialogContent className="sm:max-w-md">
@@ -1010,6 +1158,41 @@ const fetchSounds = async (isReset = false, retryCount = 0) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Add CSS for ad containers */}
+      <style jsx>{`
+        .ad-container {
+          min-height: 250px;
+          background-color: rgba(255, 255, 255, 0.5);
+          border-radius: 8px;
+          overflow: hidden;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+        }
+        
+        .left-side-ad, .right-side-ad {
+          min-width: 160px;
+          min-height: 600px;
+        }
+        
+        .bottom-fixed-ad {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          width: 100%;
+          z-index: 50;
+          min-height: 90px;
+          background: white;
+        }
+        
+        /* Hide ads in development environment */
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .left-side-ad, .right-side-ad {
+            min-height: 250px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

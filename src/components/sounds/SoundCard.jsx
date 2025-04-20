@@ -1,17 +1,20 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Flame, Sparkles, Trophy, Heart } from "lucide-react";
+import { Clock, Flame, Sparkles, Trophy, Heart, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import LeaderboardModal from "./LeaderboardModal";
 import SocialService from "@/components/services/SocialService";
 
-export default function SoundCard({ sound }) {
+export default function SoundCard({ sound, isAnonymousGuest, onInteraction }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isLiked, setIsLiked] = useState(sound?.isLiked || false);
+  const [isSaved, setIsSaved] = useState(sound?.isSaved || false);
   const [likeCount, setLikeCount] = useState(sound?.num_of_likes || 0);
   const [loading, setLoading] = useState(false);
 
@@ -62,6 +65,37 @@ export default function SoundCard({ sound }) {
     }
   };
 
+  const handleSave = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isAnonymousGuest && onInteraction) {
+      onInteraction();
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setIsSaved(!isSaved);
+
+      if (isSaved) {
+        await SocialService.unsaveSound(sound.id);
+      } else {
+        await SocialService.saveSound(sound.id);
+      }
+    } catch (error) {
+      console.error('Error toggling save:', error);
+      setIsSaved(!isSaved); // Revert state on error
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update isSaved state when sound prop changes
+  useEffect(() => {
+    setIsSaved(sound?.isSaved || false);
+  }, [sound?.isSaved]);
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
@@ -100,16 +134,45 @@ export default function SoundCard({ sound }) {
             <div className="flex justify-between items-start">
               <h3 className="font-semibold text-lg leading-tight">{sound.name}</h3>
               <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`text-pink-500 hover:text-pink-600 ${isLiked ? 'bg-pink-50' : ''}`}
-                  onClick={handleLike}
-                  disabled={loading}
-                >
-                  <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
-                  <span className="ml-1">{likeCount}</span>
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`${isLiked ? 'text-pink-500 bg-pink-50' : 'text-pink-500 hover:text-pink-600'}`}
+                        onClick={handleLike}
+                        disabled={loading}
+                      >
+                        <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+                        <span className="ml-1">{likeCount}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isLiked ? 'Unlike' : 'Like'} this sound</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`${isSaved ? 'text-yellow-500 bg-yellow-50' : 'text-yellow-500 hover:text-yellow-600'}`}
+                        onClick={handleSave}
+                        disabled={loading}
+                      >
+                        <Star className={`w-4 h-4 ${isSaved ? 'fill-current' : ''}`} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isSaved ? 'Remove from saved' : 'Save'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
                 <Button
                   variant="ghost"
                   size="sm"

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +19,8 @@ import {
   Trophy,
   ChevronDown, 
   ChevronUp, 
-  Repeat 
+  Repeat,
+  Star
 } from "lucide-react";
 import LeaderboardModal from "../components/sounds/LeaderboardModal";
 import SocialSection from "../components/sounds/SocialSection";
@@ -70,6 +72,8 @@ export default function MemeSoundPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [echoCount, setEchoCount] = useState(0);
   const [isConfigLocked, setIsConfigLocked] = useState(false);
+
+  const [isSaved, setIsSaved] = useState(false);
   
   // Audio refs
   const audioRef = useRef(null);
@@ -320,6 +324,7 @@ const fetchSoundDetails = async (retryCount = 0) => {
           if (exactMatch) {
             setSound(exactMatch);
             setLoading(false);
+            setIsSaved(exactMatch.isSaved || false);
             return;
           }
         }
@@ -327,6 +332,7 @@ const fetchSoundDetails = async (retryCount = 0) => {
         // Otherwise use the first result
         setSound(searchData.result.data[0]);
         setLoading(false);
+        setIsSaved(searchData.result.data[0].isSaved || false);
         return;
       }
     }
@@ -372,12 +378,14 @@ const fetchSoundDetails = async (retryCount = 0) => {
             if (exactMatch) {
               setSound(exactMatch);
               setLoading(false);
+              setIsSaved(exactMatch.isSaved || false);
               return;
             }
           }
           
           setSound(fallbackData.result.data[0]);
           setLoading(false);
+          setIsSaved(fallbackData.result.data[0].isSaved || false);
           return;
         }
       }
@@ -439,12 +447,55 @@ const fetchSoundDetails = async (retryCount = 0) => {
     
     if (foundSound) {
       setSound(foundSound);
+      setIsSaved(foundSound.isSaved || false);
     } else {
       throw new Error(`Sound "${searchTerm}" not found`);
     }
   } catch (err) {
     console.error("Error fetching sound:", err);
     setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleToggleSave = async () => {
+  try {
+    setLoading(true);
+    setIsSaved(!isSaved);
+    
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        console.error('Authentication required');
+        return;
+    }
+
+    const baseUrl = 'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net';
+      const endpoint = isSaved ? '/removeSoundFromUserLibrary' : '/addSoundToUserLibrary';
+
+      const response = await fetch(`${baseUrl}${endpoint}`, {
+          method: 'POST',
+          headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              soundId: sound.id,
+          }),
+      });
+
+      if (!response.ok) {
+          throw new Error(`Failed to ${isSaved ? 'unsave' : 'save'} sound`);
+      }
+
+      const data = await response.json();
+      if (!data.result?.success) {
+        throw new Error(data.result?.error || `Failed to ${isSaved ? 'unsave' : 'save'} sound`);
+      }
+  } catch (error) {
+    console.error('Error toggling save state:', error);
+    setIsSaved(isSaved);
+    setError(error.message);
   } finally {
     setLoading(false);
   }
@@ -892,7 +943,7 @@ const handleStatsUpdate = async (listenTime) => {
                 </Button>
 
                 {/* Complete solution for fully visible tooltip with disabled button */}
-                <div className="relative inline-block"> {/* Container with relative positioning */}
+                <div className="relative inline-block">
                   <Button 
                     onClick={handleApplyStats}
                     className={`h-12 ${
@@ -963,6 +1014,25 @@ const handleStatsUpdate = async (listenTime) => {
                   <Download className="w-5 h-5 mr-2" />
                   Download
                 </Button>
+                
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        onClick={handleToggleSave}
+                        variant="outline"
+                        className={`h-12 ${isSaved ? "text-yellow-500 bg-yellow-50 border-yellow-200" : ""}`}
+                        disabled={loading}
+                      >
+                        <Star className={`w-5 h-5 mr-2 ${isSaved ? "fill-yellow-500" : ""}`} />
+                        {isSaved ? "Saved" : "Save"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isSaved ? "Remove from saved" : "Add to saved sounds"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
 
             <div className="space-y-4">
