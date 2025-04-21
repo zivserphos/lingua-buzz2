@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useCallback } from "react"; // Add useCallback
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -59,8 +59,18 @@ export default function SoundsPage() {
     fetchSounds,
     handleSearchInput,
     handleLanguageChange,
+    handleExplicitSearch, // Use explicit search handler
     hasNextPage,
+    currentPage,
   } = useSoundsData(idToken);
+
+  // NEW: Add callback for loading more items
+  const handleLoadMore = useCallback(() => {
+    if (!loading && hasNextPage) {
+      console.log(`Loading more sounds (page ${currentPage})`);
+      fetchSounds({ reset: false }); // Load more items without resetting
+    }
+  }, [fetchSounds, loading, hasNextPage, currentPage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
@@ -91,14 +101,14 @@ export default function SoundsPage() {
           language={language}
           onSearchChange={handleSearchInput}
           onLanguageChange={handleLanguageChange}
-          onSearch={() => fetchSounds(true)}
+          onSearch={handleExplicitSearch} // FIXED: Use handleExplicitSearch
         />
 
         {/* Error message */}
         {error && (
           <ErrorMessage 
             error={error}
-            onRetry={() => fetchSounds(true)}
+            onRetry={() => fetchSounds({ reset: true })}
           />
         )}
 
@@ -109,7 +119,7 @@ export default function SoundsPage() {
             <p className="text-sm text-gray-500 mb-2">Loading sounds...</p>
             <Button 
               onClick={() => {
-                fetchSounds(true);
+                fetchSounds({ reset: true });
               }}
               variant="outline"
               size="sm"
@@ -135,6 +145,8 @@ export default function SoundsPage() {
               loadingIndicatorRef={loadingIndicatorRef}
               onShowAuthBanner={() => setShowAuthBanner(true)}
               initialLoading={initialLoading}
+              onLoadMore={handleLoadMore} // FIXED: Add onLoadMore prop
+              language={language}
             />
             
             {/* RIGHT SIDE AD */}

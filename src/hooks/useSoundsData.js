@@ -21,13 +21,24 @@ export default function useSoundsData(idToken) {
   // Simple refs
   const isMounted = useRef(true);
   const initialized = useRef(false);
+  const searchTermRef = useRef(searchTerm);
+  const languageRef = useRef(language); // NEW: Add a ref for language to avoid dependency issues
+  
+  // Update refs when values change
+  useEffect(() => {
+    searchTermRef.current = searchTerm;
+  }, [searchTerm]);
+  
+  useEffect(() => {
+    languageRef.current = language; // NEW: Update language ref when language changes
+  }, [language]);
   
   // SIMPLIFIED: Put "search" function outside useCallback to avoid dependency issues
   async function performSearch(options = {}) {
     const {
       reset = true,
-      lang = language,
-      term = searchTerm,
+      lang = languageRef.current, // FIXED: Always use the current language from ref
+      term = searchTermRef.current, // Use ref value for most current state
       page = reset ? 1 : currentPage
     } = options;
     
@@ -51,15 +62,19 @@ export default function useSoundsData(idToken) {
       
       // Build request
       const requestBody = {
-        language: lang,
+        language: lang, // Always use the language passed in options
         limit: 20,
         page
       };
       
-      // Add search term if present
+      // Add search term if present - CRITICAL FIX FOR SEARCH
       if (term?.trim()) {
+        console.log(`Adding search term to request: "${term.trim()}"`);
         requestBody.search = term.trim();
       }
+      
+      // Log the request body for debugging
+      console.log("API request payload:", JSON.stringify(requestBody));
       
       // Make request
       const response = await fetch(
@@ -172,15 +187,29 @@ export default function useSoundsData(idToken) {
   }, [language]); // Only depend on language
   
   // Simple search input handler - no dependencies
+  // FIXED: This just tracks the input without triggering search
   const handleSearchInput = useCallback((value) => {
+    console.log(`Search input updated: "${value}"`);
     setSearchTerm(value);
   }, []);
   
-  // Simple search trigger - no dependencies
+  // Simple search trigger - FIXED to use current searchTerm AND current language
+  // This is triggered ONLY when search button is clicked
   const handleExplicitSearch = useCallback(() => {
-    console.log("Search button clicked");
-    performSearch({ reset: true });
-  }, [searchTerm, language]); // Depend on current search term and language
+    // Always get the current language from ref - CRITICAL FIX
+    const currentLang = languageRef.current;
+    console.log(`Search button clicked - executing search with term: "${searchTermRef.current}", language: "${currentLang}"`);
+    
+    // Force reset pagination
+    setCurrentPage(1);
+    
+    // Execute search with current term AND current language
+    performSearch({ 
+      reset: true,
+      term: searchTermRef.current,
+      lang: currentLang // CRITICAL FIX: Explicitly pass current language
+    });
+  }, []); // No dependencies to prevent re-renders
   
   // Initialization effect - runs once
   useEffect(() => {
@@ -218,9 +247,11 @@ export default function useSoundsData(idToken) {
           
           // Always set language from localStorage
           setLanguage(storedLang || "English");
+          languageRef.current = storedLang || "English"; // FIXED: Update the language ref too
           
           // Restore search term
           setSearchTerm(parsedState.searchTerm || "");
+          searchTermRef.current = parsedState.searchTerm || ""; // Also update ref
           
           initialized.current = true;
           
@@ -239,7 +270,6 @@ export default function useSoundsData(idToken) {
         console.error("Error restoring state:", e);
       }
     }
-    
     
     // If we got here, we didn't restore state
     
@@ -284,7 +314,15 @@ export default function useSoundsData(idToken) {
     hasNextPage,
     totalPages,
     totalItems,
-    fetchSounds: useCallback(performSearch, []), // For compatibility
+    fetchSounds: useCallback((options) => {
+      const requestOptions = { 
+        ...options,
+        lang: options.lang || languageRef.current,
+        page: options?.reset === false ? currentPage : 1 
+      };
+      // FIXED: Always merge with current language from ref
+      performSearch(requestOptions);
+    }, [currentPage]), // For compatibility
     handleSearchInput,
     handleLanguageChange,
     handleExplicitSearch,

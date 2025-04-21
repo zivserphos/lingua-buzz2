@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import SoundCard from "./SoundCard";
@@ -11,8 +11,34 @@ export default function SoundGrid({
   isAnonymousGuest,
   loadingIndicatorRef,
   onShowAuthBanner,
-  initialLoading
+  initialLoading,
+  onLoadMore, // NEW: Add callback prop for loading more
+  language
 }) {
+  // NEW: Add intersection observer for lazy loading
+  useEffect(() => {
+    if (!loadingIndicatorRef?.current || !hasNextPage) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // When loading indicator comes into view and we're not already loading
+        if (entries[0].isIntersecting && hasNextPage && !loading) {
+          console.log("📜 Intersection observed - loading more sounds");
+          onLoadMore();
+        }
+      },
+      { threshold: 0.1 } // Trigger when 10% visible
+    );
+    
+    observer.observe(loadingIndicatorRef.current);
+    
+    return () => {
+      if (loadingIndicatorRef.current) {
+        observer.unobserve(loadingIndicatorRef.current);
+      }
+    };
+  }, [loadingIndicatorRef, hasNextPage, loading, onLoadMore]);
+
   return (
     <div className="flex-1 max-w-full">
       {totalItems > 0 && (
@@ -33,6 +59,7 @@ export default function SoundGrid({
             sound={sound}
             isAnonymousGuest={isAnonymousGuest}
             onInteraction={isAnonymousGuest ? onShowAuthBanner : undefined}
+            language={language}
           />
         ))}
       </motion.div>
@@ -47,9 +74,12 @@ export default function SoundGrid({
       {/* Loading indicator for infinite scroll */}
       <div 
         ref={loadingIndicatorRef} 
-        className="flex justify-center mt-8 mb-4 h-10"
+        className="flex justify-center mt-8 mb-4 h-16 py-4"
       >
-        {loading && <Loader2 className="w-8 h-8 animate-spin text-purple-600" />}
+        {loading && hasNextPage && <Loader2 className="w-8 h-8 animate-spin text-purple-600" />}
+        {!hasNextPage && sounds.length > 0 && (
+          <div className="text-gray-500 text-sm">No more sounds to load</div>
+        )}
       </div>
     </div>
   );

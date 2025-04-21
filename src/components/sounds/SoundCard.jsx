@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import LeaderboardModal from "./LeaderboardModal";
 import SocialService from "@/components/services/SocialService";
 
-export default function SoundCard({ sound, isAnonymousGuest, onInteraction }) {
+export default function SoundCard({ sound, isAnonymousGuest, onInteraction, language  }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isLiked, setIsLiked] = useState(sound?.isLiked || false);
   const [isSaved, setIsSaved] = useState(sound?.isSaved || false);
@@ -21,7 +21,8 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction }) {
   const soundUrl = createPageUrl("MemeSound", { name: sound.id });
   const soundState = { 
     soundName: sound.name,
-    soundId: sound.id
+    soundId: sound.id,
+    language: language
   };
 
   const leaderboardStats = [
