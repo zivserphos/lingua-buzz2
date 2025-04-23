@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import SocialService from '@/components/services/SocialService';
 
-export default function SocialSection({ sound }) {
+export default function SocialSection({ sound,isAnonymousGuest, onInteraction }) {
   const [comments, setComments] = useState([]);
   const [isLiked, setIsLiked] = useState(sound?.isLiked || false);
   const [totalLikesCount, setTotalLikesCount] = useState(sound?.num_of_likes || 0);
@@ -83,6 +83,11 @@ export default function SocialSection({ sound }) {
   );
 
   const handleSoundLike = () => {
+    if (isAnonymousGuest && onInteraction) {
+      onInteraction('like');
+      return;
+    }
+
     const newLikedState = !isLiked;
     setIsLiked(newLikedState);
     
@@ -93,6 +98,10 @@ export default function SocialSection({ sound }) {
   };
 
   const handleCommentLike = (commentId) => {
+    if (isAnonymousGuest && onInteraction) {
+      onInteraction('comment');
+      return;
+    }
     // Get the current comment's like status
     const isCurrentlyLiked = likedComments.has(commentId);
     const shouldLike = !isCurrentlyLiked;
@@ -165,6 +174,11 @@ export default function SocialSection({ sound }) {
   const handleComment = async (e) => {
     e.preventDefault();
     if (!newComment.trim()) return;
+
+    if (isAnonymousGuest && onInteraction) {
+      onInteraction('comment'); // Trigger guest dialog with context
+      return;
+    }
 
     const commentText = newComment;
     const tempId = `temp-${Date.now()}`;

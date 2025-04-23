@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+// Constants
+const PUBLIC_API_URL = 'https://publicmetadata-stbfcg576q-uc.a.run.app';
+const AUTH_API_URL = 'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata';
+
 export default function useSoundsData(idToken) {
-  // Basic states
+  // State variables
   const [sounds, setSounds] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(false); // Start false to avoid issues
-  const [language, setLanguage] = useState(() => {
-    // Initialize from localStorage if available
-    return localStorage.getItem('preferred_language') || "English";
-  });
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [language, setLanguage] = useState(() => localStorage.getItem('preferred_language') || "English");
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState(null);
   
@@ -18,79 +19,79 @@ export default function useSoundsData(idToken) {
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Simple refs
+  // Refs
   const isMounted = useRef(true);
   const initialized = useRef(false);
   const searchTermRef = useRef(searchTerm);
-  const languageRef = useRef(language); // NEW: Add a ref for language to avoid dependency issues
+  const languageRef = useRef(language);
+  const isFirstLoad = useRef(true);
   
   // Update refs when values change
-  useEffect(() => {
-    searchTermRef.current = searchTerm;
-  }, [searchTerm]);
+  useEffect(() => { searchTermRef.current = searchTerm; }, [searchTerm]);
+  useEffect(() => { languageRef.current = language; }, [language]);
   
-  useEffect(() => {
-    languageRef.current = language; // NEW: Update language ref when language changes
-  }, [language]);
-  
-  // SIMPLIFIED: Put "search" function outside useCallback to avoid dependency issues
+  // Main search function
   async function performSearch(options = {}) {
-    const {
-      reset = true,
-      lang = languageRef.current, // FIXED: Always use the current language from ref
-      term = searchTermRef.current, // Use ref value for most current state
-      page = reset ? 1 : currentPage
-    } = options;
-    
     // Prevent duplicate requests
     if (loading) {
-      console.log("Already loading, ignoring request");
+      console.log("⏳ Already loading, ignoring request");
       return;
     }
+
+    const {
+      reset = true,
+      lang = languageRef.current,
+      term = searchTermRef.current,
+      page = reset ? 1 : currentPage,
+      forcePublic = isFirstLoad.current // Force public API for first load
+    } = options;
     
     // Set loading state
     setLoading(true);
     
-    console.log(`Searching with: language=${lang}, term="${term}", page=${page}`);
+    console.log(`🔍 Searching: language=${lang}, term="${term}", page=${page}, forcePublic=${forcePublic}`);
     
     try {
-      // Get token
+      // Determine authentication status
       const token = idToken || localStorage.getItem('access_token');
-      if (!token) {
-        throw new Error('No authentication token');
-      }
+      const hasValidToken = !!(token && token.length > 10);
+      const isAuthenticated = hasValidToken && !forcePublic;
       
-      // Build request
+      console.log(`🔑 Auth status: ${isAuthenticated ? 'Authenticated' : 'Anonymous/Public'}`);
+      
+      // Request body
       const requestBody = {
-        language: lang, // Always use the language passed in options
+        language: lang,
         limit: 20,
         page
       };
       
-      // Add search term if present - CRITICAL FIX FOR SEARCH
       if (term?.trim()) {
-        console.log(`Adding search term to request: "${term.trim()}"`);
         requestBody.search = term.trim();
       }
       
-      // Log the request body for debugging
-      console.log("API request payload:", JSON.stringify(requestBody));
+      // Choose endpoint based on auth status
+      const apiEndpoint = isAuthenticated ? AUTH_API_URL : PUBLIC_API_URL;
+      console.log(`📡 Using API: ${isAuthenticated ? 'AUTH' : 'PUBLIC'}`);
+      
+      // Headers
+      const headers = { 'Content-Type': 'application/json' };
+      
+      if (isAuthenticated) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       
       // Make request
-      const response = await fetch(
-        'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(requestBody)
-        }
-      );
+      console.log(`🚀 Fetching from: ${apiEndpoint}`);
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody)
+      });
       
-      // Handle errors
+      // Check response
       if (!response.ok) {
+        console.error(`❌ API Error: ${response.status} ${response.statusText}`);
         throw new Error(`Server error: ${response.status}`);
       }
       
@@ -102,23 +103,28 @@ export default function useSoundsData(idToken) {
       
       // Get sounds
       const newSounds = data.result.data || [];
-      console.log(`Got ${newSounds.length} sounds`);
+      console.log(`✅ Received ${newSounds.length} sounds`);
       
-      // Update state if still mounted
+      // Mark anonymous sounds
+      if (!isAuthenticated) {
+        newSounds.forEach(sound => sound.isAnonymousView = true);
+      }
+      
       if (isMounted.current) {
-        // Update sounds
+        // Update state
         setSounds(prev => reset ? newSounds : [...prev, ...newSounds]);
-        
-        // Update pagination
-        setHasNextPage(data.result.pagination.hasNextPage);
-        setTotalPages(data.result.pagination.totalPages);
-        setTotalItems(data.result.pagination.totalItems);
         setCurrentPage(reset ? 2 : page + 1);
-        
-        // Clear errors
+        setHasNextPage(data.result.pagination?.hasNextPage || false);
+        setTotalPages(data.result.pagination?.totalPages || 0);
+        setTotalItems(data.result.pagination?.totalItems || 0);
         setError(null);
         
-        // Save state to session storage
+        // Update first load flag
+        if (isFirstLoad.current) {
+          isFirstLoad.current = false;
+        }
+        
+        // Save state
         saveStateToSession(
           reset ? newSounds : [...(reset ? [] : sounds), ...newSounds],
           reset ? 2 : page + 1,
@@ -128,12 +134,11 @@ export default function useSoundsData(idToken) {
         );
       }
     } catch (err) {
-      console.error('Search error:', err);
+      console.error('🛑 Search error:', err);
       if (isMounted.current) {
         setError(`Could not load sounds: ${err.message}`);
       }
     } finally {
-      // Always reset loading state if mounted
       if (isMounted.current) {
         setLoading(false);
         setInitialLoading(false);
@@ -141,12 +146,12 @@ export default function useSoundsData(idToken) {
     }
   }
   
-  // Helper to save state to session storage
+  // Save state to session storage
   function saveStateToSession(soundsList, pageNum, pagination, lang, term) {
     if (!soundsList?.length) return;
     
     try {
-      const stateToSave = {
+      sessionStorage.setItem('sounds_page_state', JSON.stringify({
         sounds: soundsList,
         currentPage: pageNum,
         hasNextPage: pagination?.hasNextPage || false,
@@ -156,153 +161,113 @@ export default function useSoundsData(idToken) {
         searchTerm: term,
         scrollPosition: window.pageYOffset,
         timestamp: Date.now()
-      };
-      
-      sessionStorage.setItem('sounds_page_state', JSON.stringify(stateToSave));
+      }));
     } catch (e) {
-      console.error("Error saving sounds state to session", e);
+      console.error("Error saving state:", e);
     }
   }
   
-  // Simple language change handler - no dependencies
+  // Language change handler
   const handleLanguageChange = useCallback((newLanguage) => {
     if (!newLanguage || newLanguage === language) return;
     
-    console.log(`Changing language to: ${newLanguage}`);
-    
-    // First update localStorage
     localStorage.setItem('preferred_language', newLanguage);
-    
-    // Then update state
     setLanguage(newLanguage);
     
-    // Execute search after a small delay (if initialized)
     if (initialized.current) {
-      setTimeout(() => {
-        if (isMounted.current) {
-          performSearch({ reset: true, lang: newLanguage });
-        }
-      }, 10);
+      performSearch({ reset: true, lang: newLanguage });
     }
-  }, [language]); // Only depend on language
+  }, [language]);
   
-  // Simple search input handler - no dependencies
-  // FIXED: This just tracks the input without triggering search
-  const handleSearchInput = useCallback((value) => {
-    console.log(`Search input updated: "${value}"`);
-    setSearchTerm(value);
+  // Search handlers
+  const handleSearchInput = useCallback(value => setSearchTerm(value), []);
+  const handleExplicitSearch = useCallback(() => {
+    performSearch({ reset: true, term: searchTermRef.current, lang: languageRef.current });
   }, []);
   
-  // Simple search trigger - FIXED to use current searchTerm AND current language
-  // This is triggered ONLY when search button is clicked
-  const handleExplicitSearch = useCallback(() => {
-    // Always get the current language from ref - CRITICAL FIX
-    const currentLang = languageRef.current;
-    console.log(`Search button clicked - executing search with term: "${searchTermRef.current}", language: "${currentLang}"`);
-    
-    // Force reset pagination
-    setCurrentPage(1);
-    
-    // Execute search with current term AND current language
-    performSearch({ 
-      reset: true,
-      term: searchTermRef.current,
-      lang: currentLang // CRITICAL FIX: Explicitly pass current language
-    });
-  }, []); // No dependencies to prevent re-renders
-  
-  // Initialization effect - runs once
+  // Initialize on mount
   useEffect(() => {
-    // Try to restore from session storage
-    const savedState = sessionStorage.getItem('sounds_page_state');
-  
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        
-        // Only use state if it's recent (less than 30 min old)
-        if (Date.now() - parsedState.timestamp < 30 * 60 * 1000) {
-          console.log("Restoring saved state");
-          
-          // Get current language preference from localStorage
-          const storedLang = localStorage.getItem('preferred_language');
-          
-          // CRITICAL FIX: Only restore sounds if the language matches
-          if (storedLang && parsedState.language === storedLang) {
-            // Language matches - restore everything
-            setSounds(parsedState.sounds || []);
-            setCurrentPage(parsedState.currentPage || 1);
-            setHasNextPage(parsedState.hasNextPage || false);
-            setTotalPages(parsedState.totalPages || 0);
-            setTotalItems(parsedState.totalItems || 0);
-          } else {
-            // Language is different - don't restore sounds
-            console.log("Language changed - clearing previous sounds");
-            setSounds([]);
-            setCurrentPage(1);
-            setHasNextPage(false);
-            setTotalPages(0);
-            setTotalItems(0);
-          }
-          
-          // Always set language from localStorage
-          setLanguage(storedLang || "English");
-          languageRef.current = storedLang || "English"; // FIXED: Update the language ref too
-          
-          // Restore search term
-          setSearchTerm(parsedState.searchTerm || "");
-          searchTermRef.current = parsedState.searchTerm || ""; // Also update ref
-          
-          initialized.current = true;
-          
-          // If language changed, we need to fetch new data
-          if (storedLang && parsedState.language !== storedLang) {
-            setTimeout(() => {
-              if (isMounted.current) {
-                performSearch({ reset: true, lang: storedLang });
-              }
-            }, 50);
-          }
-          
-          return; // Skip initial fetch below
-        }
-      } catch (e) {
-        console.error("Error restoring state:", e);
-      }
-    }
+    console.log("🏁 Component mounted - initializing");
     
-    // If we got here, we didn't restore state
-    
-    // Make initial fetch with slight delay
-    setTimeout(() => {
-      if (isMounted.current) {
-        const token = idToken || localStorage.getItem('access_token');
-        if (token) {
-          performSearch({ reset: true });
-        } else {
-          setInitialLoading(false);
+    const loadInitialData = async () => {
+      // Try to restore state from session
+      const savedState = sessionStorage.getItem('sounds_page_state');
+      
+      if (savedState) {
+        try {
+          const parsedState = JSON.parse(savedState);
+          
+          // Only use recent state (less than 30 min old)
+          if (Date.now() - parsedState.timestamp < 30 * 60 * 1000) {
+            console.log("✅ Restoring saved state");
+            
+            const storedLang = localStorage.getItem('preferred_language') || "English";
+            
+            // Restore appropriate state
+            if (storedLang && parsedState.language === storedLang) {
+              setSounds(parsedState.sounds || []);
+              setCurrentPage(parsedState.currentPage || 1);
+              setHasNextPage(parsedState.hasNextPage || false);
+              setTotalPages(parsedState.totalPages || 0);
+              setTotalItems(parsedState.totalItems || 0);
+            } else {
+              console.log("⚠️ Language changed - clearing sounds");
+              setSounds([]);
+              setCurrentPage(1);
+              setHasNextPage(false);
+              setTotalPages(0);
+              setTotalItems(0);
+            }
+            
+            // Set language and search term
+            setLanguage(storedLang);
+            languageRef.current = storedLang;
+            setSearchTerm(parsedState.searchTerm || "");
+            searchTermRef.current = parsedState.searchTerm || "";
+            
+            initialized.current = true;
+            
+            // Fetch new data if language changed
+            if (storedLang && parsedState.language !== storedLang) {
+              console.log("🔄 Language changed, fetching new data");
+              performSearch({ reset: true, forcePublic: isFirstLoad.current });
+            } else {
+              // No need to fetch, already have data
+              setInitialLoading(false);
+              isFirstLoad.current = false;
+            }
+            
+            return;
+          }
+        } catch (e) {
+          console.error("❌ Error restoring state:", e);
         }
       }
       
+      // First time user - get public data
+      console.log("🆕 New user - fetching public data");
+      performSearch({ reset: true, forcePublic: true });
       initialized.current = true;
-    }, 50);
+    };
     
-    // Emergency timeout to ensure loading state doesn't get stuck
+    loadInitialData();
+    
+    // Emergency timeout
     const emergencyTimeout = setTimeout(() => {
       if (isMounted.current && (loading || initialLoading)) {
-        console.log("🚨 Emergency loading reset");
+        console.warn("⚠️ Emergency loading reset after 10s");
         setLoading(false);
         setInitialLoading(false);
       }
     }, 10000);
     
-    // Cleanup on unmount
     return () => {
       isMounted.current = false;
       clearTimeout(emergencyTimeout);
     };
-  }, []); // Empty dependency array - run once
+  }, []);
   
+  // Return hook values
   return {
     sounds,
     loading,
@@ -315,14 +280,12 @@ export default function useSoundsData(idToken) {
     totalPages,
     totalItems,
     fetchSounds: useCallback((options) => {
-      const requestOptions = { 
+      performSearch({
         ...options,
         lang: options.lang || languageRef.current,
-        page: options?.reset === false ? currentPage : 1 
-      };
-      // FIXED: Always merge with current language from ref
-      performSearch(requestOptions);
-    }, [currentPage]), // For compatibility
+        page: options?.reset === false ? currentPage : 1
+      });
+    }, [currentPage]),
     handleSearchInput,
     handleLanguageChange,
     handleExplicitSearch,

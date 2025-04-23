@@ -59,6 +59,16 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction, lang
   const handleLike = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isAnonymousGuest) {
+      onInteraction('like');
+      return;
+    }
+
+    if (isAnonymousGuest) {
+      onInteraction('like');
+      return;
+    }
     
     try {
       setLoading(true);
@@ -82,6 +92,16 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction, lang
   const handleSave = async (e) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (isAnonymousGuest) {
+      onInteraction('save');
+      return;
+    }
+
+    if (isAnonymousGuest) {
+      onInteraction('save');
+      return;
+    }
     
     if (isAnonymousGuest && onInteraction) {
       onInteraction();

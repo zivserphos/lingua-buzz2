@@ -1,37 +1,38 @@
-import React, { useRef, useCallback } from "react"; // Add useCallback
-import { motion } from "framer-motion";
-import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import React, { useRef, useCallback, useState } from 'react'; // Add useCallback
+import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 // Ads components
-import BottomFixedAd from "@/components/ads/BottomFixedAd";
-import LeftSideAd from "@/components/ads/LeftSideAd";
-import RightSideAd from "@/components/ads/RightSideAd";
+import BottomFixedAd from '@/components/ads/BottomFixedAd';
+import LeftSideAd from '@/components/ads/LeftSideAd';
+import RightSideAd from '@/components/ads/RightSideAd';
 
 // Auth components
-import AuthBanner from "@/components/auth/AuthBanner";
-import GuestDialog from "@/components/auth/GuestDialog";
+import AuthBanner from '@/components/auth/AuthBanner';
+import GuestDialog from '@/components/auth/GuestDialog';
 
 // Sound components
-import Header from "@/components/sounds/Header";
-import SearchControls from "@/components/sounds/SearchControls";
-import SoundGrid from "@/components/sounds/SoundGrid";
-import ErrorMessage from "@/components/sounds/ErrorMessage";
+import Header from '@/components/sounds/Header';
+import SearchControls from '@/components/sounds/SearchControls';
+import SoundGrid from '@/components/sounds/SoundGrid';
+import ErrorMessage from '@/components/sounds/ErrorMessage';
 
 // Custom hooks
-import useAuth from "@/hooks/useAuth";
-import useSoundsData from "@/hooks/useSoundsData";
-import useAdSense from "@/hooks/useAdSense";
+import useAuth from '@/hooks/useAuth';
+import useSoundsData from '@/hooks/useSoundsData';
+import useAdSense from '@/hooks/useAdSense';
 
 export default function SoundsPage() {
   const loadingIndicatorRef = useRef(null);
-  
+  const [interactionSource, setInteractionSource] = useState(null);
+
   // Initialize ad loading
   useAdSense();
-  
+
   // Authentication state and methods
-  const { 
-    user, 
+  const {
+    user,
     idToken,
     authLoading,
     isAnonymousGuest,
@@ -46,7 +47,7 @@ export default function SoundsPage() {
     setShowGuestDialog,
     setGuestUsername,
   } = useAuth();
-  
+
   // Sounds data and methods
   const {
     sounds,
@@ -72,21 +73,29 @@ export default function SoundsPage() {
     }
   }, [fetchSounds, loading, hasNextPage, currentPage]);
 
+  const handleSocialInteraction = (interactionType) => {
+    setInteractionSource(interactionType);
+    handleGuestDialogOpen();
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+    <div className='min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50'>
       <BottomFixedAd />
-      
-      <div className="max-w-[1600px] mx-auto px-4 py-8">
+
+      <div className='max-w-[1600px] mx-auto px-4 py-8'>
         {/* Authentication banner */}
-        <AuthBanner 
-          show={showAuthBanner && isAnonymousGuest}
-          onGuestClick={handleGuestDialogOpen}
-          onSignInClick={handleGoogleSignIn}
+        <AuthBanner
+          id='auth-banner'
+          show={showAuthBanner}
+          onGuestClick={() => setShowAuthBanner(false)}
+          onSignInClick={() => {
+            /* Navigate to sign in */
+          }}
           onClose={() => setShowAuthBanner(false)}
         />
 
         {/* Header with title and auth buttons */}
-        <Header 
+        <Header
           user={user}
           isAnonymousGuest={isAnonymousGuest}
           authLoading={authLoading}
@@ -96,7 +105,7 @@ export default function SoundsPage() {
         />
 
         {/* Search and language controls */}
-        <SearchControls 
+        <SearchControls
           searchTerm={searchTerm}
           language={language}
           onSearchChange={handleSearchInput}
@@ -106,7 +115,7 @@ export default function SoundsPage() {
 
         {/* Error message */}
         {error && (
-          <ErrorMessage 
+          <ErrorMessage
             error={error}
             onRetry={() => fetchSounds({ reset: true })}
           />
@@ -114,27 +123,30 @@ export default function SoundsPage() {
 
         {/* Loading state or content */}
         {initialLoading ? (
-          <div className="flex flex-col justify-center items-center min-h-[300px]">
-            <Loader2 className="w-10 h-10 animate-spin text-purple-600 mb-4" />
-            <p className="text-sm text-gray-500 mb-2">Loading sounds...</p>
-            <Button 
+          <div className='flex flex-col justify-center items-center min-h-[300px]'>
+            <Loader2 className='w-10 h-10 animate-spin text-purple-600 mb-4' />
+            <p className='text-sm text-gray-500 mb-2'>Loading sounds...</p>
+            <Button
               onClick={() => {
                 fetchSounds({ reset: true });
               }}
-              variant="outline"
-              size="sm"
-              className="mt-4"
+              variant='outline'
+              size='sm'
+              className='mt-4'
             >
               Reset Loading
             </Button>
           </div>
         ) : (
-          <div className="flex">
+          <div className='flex'>
             {/* LEFT SIDE AD */}
-            <div className="hidden xl:block fixed left-0 top-1/2 transform -translate-y-1/2 ml-4" style={{ width: '160px', zIndex: 40 }}>
+            <div
+              className='hidden xl:block fixed left-0 top-1/2 transform -translate-y-1/2 ml-4'
+              style={{ width: '160px', zIndex: 40 }}
+            >
               <LeftSideAd />
             </div>
-            
+
             {/* MAIN CONTENT */}
             <SoundGrid
               sounds={sounds}
@@ -144,13 +156,17 @@ export default function SoundsPage() {
               isAnonymousGuest={isAnonymousGuest}
               loadingIndicatorRef={loadingIndicatorRef}
               onShowAuthBanner={() => setShowAuthBanner(true)}
+              onShowGuestDialog={handleSocialInteraction}
               initialLoading={initialLoading}
               onLoadMore={handleLoadMore} // FIXED: Add onLoadMore prop
               language={language}
             />
-            
+
             {/* RIGHT SIDE AD */}
-            <div className="hidden xl:block fixed right-0 top-1/2 transform -translate-y-1/2 mr-4" style={{ width: '160px', zIndex: 40 }}>
+            <div
+              className='hidden xl:block fixed right-0 top-1/2 transform -translate-y-1/2 mr-4'
+              style={{ width: '160px', zIndex: 40 }}
+            >
               <RightSideAd />
             </div>
           </div>
@@ -165,8 +181,9 @@ export default function SoundsPage() {
         onOpenChange={setShowGuestDialog}
         onUsernameChange={(e) => setGuestUsername(e.target.value)}
         onSubmit={handleGuestSignIn}
+        interactionSource={interactionSource}
       />
-      
+
       {/* Ad styles */}
       <style jsx>{`
         .ad-container {
@@ -178,12 +195,13 @@ export default function SoundsPage() {
           justify-content: center;
           align-items: center;
         }
-        
-        .left-side-ad, .right-side-ad {
+
+        .left-side-ad,
+        .right-side-ad {
           min-width: 160px;
           min-height: 600px;
         }
-        
+
         .bottom-fixed-ad {
           position: fixed;
           bottom: 0;
@@ -193,9 +211,10 @@ export default function SoundsPage() {
           min-height: 90px;
           background: white;
         }
-        
+
         @media (min-width: 768px) and (max-width: 1023px) {
-          .left-side-ad, .right-side-ad {
+          .left-side-ad,
+          .right-side-ad {
             min-height: 250px;
           }
         }
