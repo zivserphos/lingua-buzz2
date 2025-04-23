@@ -17,6 +17,19 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction, lang
   const [isSaved, setIsSaved] = useState(sound?.isSaved || false);
   const [likeCount, setLikeCount] = useState(sound?.num_of_likes || 0);
   const [loading, setLoading] = useState(false);
+  const [isSquareImage, setIsSquareImage] = useState(false);
+
+  useEffect(() => {
+    if (sound?.image_url) {
+      const img = new Image();
+      img.onload = () => {
+        // If width and height are the same, it's square
+        setIsSquareImage(img.width === img.height);
+      };
+      img.src = sound.image_url;
+    }
+  }, [sound?.image_url]);
+
 
   const soundUrl = createPageUrl("MemeSound", { name: sound.id });
   const soundState = { 
@@ -111,7 +124,7 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction, lang
             <img 
               src={sound.image_url}
               alt={sound.name}
-              className="w-full h-48 object-cover"
+              className={`w-full h-48 ${isSquareImage ? 'object-fill' : 'object-cover'}`}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
