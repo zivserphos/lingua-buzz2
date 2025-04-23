@@ -927,7 +927,7 @@ const handleStatsUpdate = async (listenTime) => {
             <img 
               src={sound.image_url}
               alt={sound.name}
-              className="w-full h-[400px] object-cover"
+              className='w-full h-[400px] object-fill'
             />
             
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
