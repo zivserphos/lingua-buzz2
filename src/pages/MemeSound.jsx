@@ -518,99 +518,58 @@ export default function MemeSoundPage() {
     }
   };
 
+
   const handleToggleSave = async () => {
-    // Guard clause for anonymous users - trigger guest dialog
     if (isAnonymousGuest) {
       handleSocialInteraction('save'); 
       return;
     }
-    
-    // Guard clause for completely unauthenticated users
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      console.error('Authentication required');
-      setError('Please sign in to save sounds');
-      return;
-    }
-    
+
     try {
       setLoading(true);
+      // Update UI optimistically
+      setIsSaved(!isSaved);
       
-      // Optimistically update UI
-      const newSavedState = !isSaved;
-      setIsSaved(newSavedState);
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+          console.error('Authentication required');
+          return;
+      }
   
-      const baseUrl = 'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net';
-      const endpoint = newSavedState ? '/addSoundToUserLibrary' : '/removeSoundFromUserLibrary';
+      // Use different endpoints for save vs unsave
+      const endpoint = isSaved 
+        ? 'https://unsavesound-stbfcg576q-uc.a.run.app' 
+        : 'https://savesound-stbfcg576q-uc.a.run.app';
   
-      console.log(`Making API request to ${baseUrl}${endpoint} with sound ID ${sound.id}`);
-      
-      const response = await fetch(`${baseUrl}${endpoint}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          soundId: sound.id,
-        }),
+      // Send the request with the correct format
+      const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              data: {
+                  soundId: sound.id,
+              }
+          }),
       });
   
-      // Handle 401 Unauthorized - try token refresh
-      if (response.status === 401) {
-        console.log('Token expired, attempting refresh...');
-        const refreshToken = localStorage.getItem('refresh_token');
-        
-        if (refreshToken) {
-          const newToken = await refreshAccessToken(refreshToken);
-          
-          if (newToken) {
-            // Retry with new token
-            const retryResponse = await fetch(`${baseUrl}${endpoint}`, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${newToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                soundId: sound.id,
-              }),
-            });
-            
-            if (!retryResponse.ok) {
-              throw new Error(`Failed to ${newSavedState ? 'save' : 'unsave'} sound (${retryResponse.status})`);
-            }
-            
-            const retryData = await retryResponse.json();
-            if (!retryData.result?.success) {
-              throw new Error(retryData.result?.error || 'API error');
-            }
-            
-            console.log('Save operation successful after token refresh');
-            return;
-          }
-        }
-        
-        // If we got here, refresh failed
-        throw new Error('Your session has expired. Please sign in again.');
-      }
-      
       if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
+          throw new Error(`Failed to ${isSaved ? 'unsave' : 'save'} sound`);
       }
   
       const data = await response.json();
       if (!data.result?.success) {
-        throw new Error(data.result?.error || 'Unknown API error');
+        throw new Error(data.result?.error || `Failed to ${isSaved ? 'unsave' : 'save'} sound`);
       }
       
-      console.log(`Successfully ${newSavedState ? 'saved' : 'unsaved'} sound`);
-      
+      console.log(`Successfully ${isSaved ? 'unsaved' : 'saved'} sound`);
     } catch (error) {
       console.error('Error toggling save state:', error);
-      // Revert UI state on error
+      // Revert UI on error
       setIsSaved(isSaved);
-      setError(error.message || 'Failed to update. Please try again.');
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -1036,6 +995,7 @@ export default function MemeSoundPage() {
           onUsernameChange={(e) => setGuestUsername(e.target.value)}
           onSubmit={handleGuestSignIn}
           interactionSource={interactionSource}
+          onGoogleSignIn={handleGoogleSignIn}
         />
       )}
 

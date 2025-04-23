@@ -182,6 +182,7 @@ export default function SoundsPage() {
         onUsernameChange={(e) => setGuestUsername(e.target.value)}
         onSubmit={handleGuestSignIn}
         interactionSource={interactionSource}
+        onGoogleSignIn={handleGoogleSignIn}
       />
 
       {/* Ad styles */}
