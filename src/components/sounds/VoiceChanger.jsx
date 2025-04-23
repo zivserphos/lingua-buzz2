@@ -2,11 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Mic2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import VoiceSelector from "./VoiceSelector";
+
+import spongebobImage from "@/assets/spongebob.webp";
+import barackObamaImage from "@/assets/barack-obama.webp";
+import djKhaledImage from "@/assets/dj-khaled.webp";
+import peterGriffinImage from "@/assets/peter-griffin.webp";
+import joeBidenImage from "@/assets/joe-biden.webp";
+import ishowspeedImage from "@/assets/ishowspeed.webp";
+import squidwardImage from "@/assets/squidward.webp";
+import patrickStarImage from "@/assets/patrick-star.webp";
+import DonuldTrump from "@/assets/donald-trump.webp";
 
 const AVAILABLE_VOICES = [
-  { id: 'donald-trump', name: 'Donald Trump', icon: '🇺🇸' },
-  { id: 'barak-obama', name: 'Barack Obama', icon: '🎤' },
-  { id: 'dj-khaled', name: 'DJ Khaled', icon: '🎵' }
+  { id: 'donald-trump', name: 'Donald Trunp', icon: '🇺🇸', image: DonuldTrump },
+  { id: 'joe-biden', name: 'Joe Biden', icon: '🇺🇸', image: joeBidenImage },
+  { id: 'barack-obama', name: 'Barack Obama', icon: '🎤', image: barackObamaImage },
+  { id: 'spongebob', name: 'Spongebob', icon: '🧽', image: spongebobImage },
+  { id: 'patrick-star', name: 'Patrick Star', icon: '⭐', image: patrickStarImage },
+  { id: 'squidward', name: 'Squidward', icon: '🦑', image: squidwardImage },
+  { id: 'peter-griffin', name: 'Peter Griffin', icon: '🍺', image: peterGriffinImage },
+  { id: 'ishowspeed', name: 'IShowSpeed', icon: '🎮', image: ishowspeedImage },
+  { id: 'dj-khaled', name: 'DJ Khaled', icon: '🎵', image: djKhaledImage },
 ];
 
 // Permanent auth token
@@ -18,6 +35,7 @@ export default function VoiceChanger({ onVoiceChange, onVoiceProcessingStart, di
   const [error, setError] = useState(null);
   const [pollCount, setPollCount] = useState(0);
   const [processingStatus, setProcessingStatus] = useState('');
+  const [isVoiceSelectorOpen, setIsVoiceSelectorOpen] = useState(false);
 
   // Reset state when disabled changes (e.g., when locked)
   useEffect(() => {
@@ -188,7 +206,7 @@ export default function VoiceChanger({ onVoiceChange, onVoiceProcessingStart, di
       return;
     }
     setSelectedVoice(voiceId);
-    // Don't process immediately - wait for button click
+    setIsVoiceSelectorOpen(false);
   };
 
   const applyVoiceChange = () => {
@@ -200,8 +218,10 @@ export default function VoiceChanger({ onVoiceChange, onVoiceProcessingStart, di
       processVoiceChange(selectedVoice);
     }
   };
+  
+  const selectedVoiceObject = AVAILABLE_VOICES.find(voice => voice.id === selectedVoice);
 
-  return (
+ return (
     <div className="space-y-4">
       <div>
         <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -210,29 +230,22 @@ export default function VoiceChanger({ onVoiceChange, onVoiceProcessingStart, di
         </label>
         
         <div className="flex gap-3 mt-2">
-          <Select
-            value={selectedVoice}
-            onValueChange={handleSelectVoice}
+          <Button
+            variant="outline"
+            type="button"
             disabled={disabled || processing || loading || !audioUrl}
-            className="flex-1"
+            className="flex-1 h-10 justify-between"
+            onClick={() => setIsVoiceSelectorOpen(true)}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Select a voice" />
-            </SelectTrigger>
-            <SelectContent>
-              {AVAILABLE_VOICES.map((voice) => (
-                <SelectItem
-                  key={voice.id}
-                  value={voice.id}
-                >
-                  <div className="flex items-center gap-2">
-                    <span>{voice.icon}</span>
-                    <span>{voice.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            {selectedVoiceObject ? (
+              <div className="flex items-center gap-2">
+                <span>{selectedVoiceObject.icon}</span>
+                <span>{selectedVoiceObject.name}</span>
+              </div>
+            ) : (
+              <span className="text-gray-500">Select a voice</span>
+            )}
+          </Button>
           
           <Button 
             onClick={applyVoiceChange} 
@@ -250,6 +263,15 @@ export default function VoiceChanger({ onVoiceChange, onVoiceProcessingStart, di
           </Button>
         </div>
       </div>
+      
+      {/* Voice Selector Dialog */}
+      <VoiceSelector
+        voices={AVAILABLE_VOICES}
+        isOpen={isVoiceSelectorOpen}
+        onClose={() => setIsVoiceSelectorOpen(false)}
+        onSelectVoice={handleSelectVoice}
+        selectedVoice={selectedVoice}
+      />
       
       {error && (
         <p className="text-xs text-red-600 mt-1">
