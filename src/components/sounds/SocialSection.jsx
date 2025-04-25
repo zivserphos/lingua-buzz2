@@ -286,7 +286,7 @@ export default function SocialSection({ sound,isAnonymousGuest, onInteraction })
                 </Avatar>
                 <div className="flex-1">
                   <div className="font-medium">
-                    User {comment.userId?.substring(0, 5) || 'Anonymous'}
+                  {comment.displayName || `User ${comment.userId?.substring(0, 5) || 'Anonymous'}`}
                   </div>
                   <div className="text-gray-600">{comment.text}</div>
                   <div className="flex items-center gap-4 mt-2">
