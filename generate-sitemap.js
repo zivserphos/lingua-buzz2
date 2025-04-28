@@ -1,6 +1,5 @@
 import { SitemapStream } from 'sitemap';
 import { createWriteStream } from 'fs';
-import { writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { blogPosts } from './src/components/blog/blogposts.js';
@@ -90,15 +89,35 @@ async function generateSitemap() {
           priority: 0.7
         });
       });
+
+      // Add language-specific memesound pages with sound IDs for popular sounds
+      // This helps search engines discover your most important sound pages
+      const popularSoundIds = ['popular-sound-1', 'popular-sound-2', 'viral-sound-1'];
+      popularSoundIds.forEach(soundId => {
+        smStream.write({
+          url: `/${language}/memesound/${soundId}`,
+          changefreq: 'monthly',
+          priority: 0.6
+        });
+      });
     });
 
-    // End the stream
+    // Close the stream and finalize the sitemap
     smStream.end();
     
     console.log('Sitemap generated successfully!');
+    
+    // You can also add a timestamp to track when the sitemap was last generated
+    console.log(`Generated at: ${new Date().toISOString()}`);
   } catch (error) {
     console.error('Error generating sitemap:', error);
+    process.exit(1); // Exit with error code
   }
 }
 
-generateSitemap();
+// Execute the function
+generateSitemap().then(() => {
+  console.log('Sitemap generation complete');
+}).catch(err => {
+  console.error('Failed to generate sitemap:', err);
+});
