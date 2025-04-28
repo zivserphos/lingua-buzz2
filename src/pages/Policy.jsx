@@ -19,19 +19,19 @@ export default function PolicyPage() {
     // Map current path to file and title
     switch (path) {
       case "privacy-policy":
-        policyFile = "/src/declarations/privacy_policy.txt";
+        policyFile = "/policies/privacy_policy.txt";
         policyTitle = "Privacy Policy";
         break;
       case "terms-of-use":
-        policyFile = "/src/declarations/terms_of_use.txt";
+        policyFile = "/policies/terms_of_use.txt";
         policyTitle = "Terms of Use";
         break;
       case "disclaimer":
-        policyFile = "/src/declarations/disclaimer.txt";
+        policyFile = "/policies/disclaimer.txt";
         policyTitle = "Disclaimer";
         break;
       case "community-guidelines":
-        policyFile = "/src/declarations/community_guidelines.txt";
+        policyFile = "/policies/community_guidelines.txt";
         policyTitle = "Community Guidelines";
         break;
       default:
