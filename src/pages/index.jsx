@@ -4,34 +4,105 @@ import Leaderboard from './Leaderboard';
 import MemeSound from './MemeSound';
 import SavedSounds from './SavedSounds';
 import PolicyPage from './Policy';
+import BlogList from '../components/blog/BlogList.jsx';
+import BlogPost from '../components/blog/BlogPost.jsx';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   BrowserRouter as Router,
   Route,
   Routes,
   useLocation,
+  Navigate,
+  useParams,
+  useNavigate,
 } from 'react-router-dom';
+import { useEffect } from 'react';
+
+export const SUPPORTED_LANGUAGES = [
+    { code: "English", flag: "🇬🇧" },
+    { code: "Portuguese", flag: "🇵🇹" },
+    { code: "Spanish", flag: "🇪🇸" },
+    { code: "German", flag: "🇩🇪" },
+    { code: "Russian", flag: "🇷🇺" },
+    { code: "Arabic", flag: "🇸🇦" },
+    { code: "Japanese", flag: "🇯🇵" },
+    { code: "Korean", flag: "🇰🇷" },
+    { code: "Vietnamese", flag: "🇻🇳" },
+    { code: "Chinese", flag: "🇨🇳" },
+    { code: "French", flag: "🇫🇷" },
+    { code: "Italian", flag: "🇮🇹" },
+    { code: "Turkish", flag: "🇹🇷" },
+    { code: "Hindi", flag: "🇮🇳" },
+    { code: "Hebrew", flag: "🇮🇱" }
+  ];
+  
+export const DEFAULT_LANGUAGE = 'English';
 
 const PAGES = {
   Sounds: Sounds,
   Leaderboard: Leaderboard,
   MemeSound: MemeSound,
   SavedSounds: SavedSounds,
+  Blog: BlogList,
 };
 
 function _getCurrentPage(url) {
-  if (url.endsWith('/')) {
-    url = url.slice(0, -1);
-  }
-  let urlLastPart = url.split('/').pop();
-  if (urlLastPart.includes('?')) {
-    urlLastPart = urlLastPart.split('?')[0];
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1);
+    }
+    
+    // Extract the last part of the URL, ignoring language prefix
+    const parts = url.split('/').filter(part => part);
+    
+    // Check if the first part is a language - explicit object handling
+    const firstPartLower = parts[0]?.toLowerCase();
+    const isFirstPartLanguage = SUPPORTED_LANGUAGES.some(
+      lang => lang.code.toLowerCase() === firstPartLower
+    );
+    
+    // If first part is a language, use the second part as the page name
+    // Otherwise, use the first part
+    let urlLastPart = isFirstPartLanguage && parts.length > 1
+      ? parts[1]
+      : parts[0] || '';
+      
+    if (urlLastPart?.includes('?')) {
+      urlLastPart = urlLastPart.split('?')[0];
+    }
+  
+    const pageName = Object.keys(PAGES).find(
+      (page) => page.toLowerCase() === urlLastPart.toLowerCase()
+    );
+    return pageName || Object.keys(PAGES)[0];
   }
 
-  const pageName = Object.keys(PAGES).find(
-    (page) => page.toLowerCase() === urlLastPart.toLowerCase()
-  );
-  return pageName || Object.keys(PAGES)[0];
-}
+// Component to handle redirecting to language-specific routes
+function LanguageRedirect({ pathSuffix = "" }) {
+    const navigate = useNavigate();
+    const params = useParams();
+    const location = useLocation();
+    
+    useEffect(() => {
+      const userLanguage = localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
+      console.log(`LanguageRedirect: Redirecting with language ${userLanguage}`);
+      
+      // If there's a sound_id parameter in the URL, preserve it
+      if (params.sound_id) {
+        navigate(`/${userLanguage.toLowerCase()}/memesound/${params.sound_id}${location.search}`);
+      } else if (params.slug) {
+        navigate(`/${userLanguage.toLowerCase()}/blog/${params.slug}${location.search}`);
+      } else {
+        const path = pathSuffix 
+          ? `/${userLanguage.toLowerCase()}/${pathSuffix}` 
+          : `/${userLanguage.toLowerCase()}`;
+        
+        // Preserve query parameters
+        navigate(`${path}${location.search}`, { replace: true });
+      }
+    }, [navigate, pathSuffix, params, location.search]);
+    
+    return null;
+  }
 
 // Create a wrapper component that uses useLocation inside the Router context
 function PagesContent() {
@@ -40,27 +111,42 @@ function PagesContent() {
 
   return (
     <Layout currentPageName={currentPage}>
+      <Helmet>
+        <title>{currentPage} | Brainrot Memes</title>
+        <meta name="description" content="Discover and share viral meme sounds, audio clips and soundboard effects." />
+        <meta property="og:title" content={`${currentPage} | Brainrot Memes`} />
+      </Helmet>
       <Routes>
-        <Route path='/' element={<Sounds />} />
-        <Route path='/Sounds' element={<Sounds />} />
-        <Route path='/sounds' element={<Sounds />} />
-        <Route path='/Leaderboard' element={<Leaderboard />} />
-        <Route path='/leaderboard' element={<Leaderboard />} />
-        <Route path='/SavedSounds' element={<SavedSounds />} />
-        <Route path='/savedsounds' element={<SavedSounds />} />
-        <Route path='/MemeSound' element={<MemeSound />} />
-        <Route path='/memesound' element={<MemeSound />} />
-        {/* <Link to='/blog' className='flex items-center'>
-          <BookOpen className='w-4 h-4 mr-1' />
-          Blog
-        </Link> */}
-        {/* Add case-insensitive routes for the name parameter */}
-        <Route path='/MemeSound/:name' element={<MemeSound />} />
-        <Route path='/memesound/:name' element={<MemeSound />} />
-        <Route path='/privacy-policy' element={<PolicyPage />} />
-        <Route path='/terms-of-use' element={<PolicyPage />} />
-        <Route path='/disclaimer' element={<PolicyPage />} />
-        <Route path='/community-guidelines' element={<PolicyPage />} />
+        {/* Root redirect */}
+        <Route path="/" element={<LanguageRedirect />} exact />
+        
+        {/* Language-specific routes */}
+        <Route path="/:language" element={<Sounds />} exact />
+        <Route path="/:language/sounds" element={<Sounds />} />
+        <Route path="/:language/leaderboard" element={<Leaderboard />} />
+        <Route path="/:language/savedsounds" element={<SavedSounds />} />
+        <Route path="/:language/memesound" element={<MemeSound />} />
+        <Route path="/:language/memesound/:sound_id" element={<MemeSound />} />
+        <Route path="/:language/blog" element={<BlogList />} />
+        <Route path="/:language/blog/:slug" element={<BlogPost />} />
+        
+        {/* Legacy routes for backward compatibility */}
+        <Route path="/sounds" element={<LanguageRedirect pathSuffix="sounds" />} />
+        <Route path="/leaderboard" element={<LanguageRedirect pathSuffix="leaderboard" />} />
+        <Route path="/savedsounds" element={<LanguageRedirect pathSuffix="savedsounds" />} />
+        <Route path="/memesound" element={<LanguageRedirect pathSuffix="memesound" />} />
+        <Route path="/memesound/:sound_id" element={<MemeSound />} />
+        <Route path="/blog" element={<LanguageRedirect pathSuffix="blog" />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
+        
+        {/* Policy pages */}
+        <Route path="/privacy-policy" element={<PolicyPage />} />
+        <Route path="/terms-of-use" element={<PolicyPage />} />
+        <Route path="/disclaimer" element={<PolicyPage />} />
+        <Route path="/community-guidelines" element={<PolicyPage />} />
+        
+        {/* Catch-all route */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );
@@ -68,8 +154,10 @@ function PagesContent() {
 
 export default function Pages() {
   return (
-    <Router>
-      <PagesContent />
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <PagesContent />
+      </Router>
+    </HelmetProvider>
   );
 }

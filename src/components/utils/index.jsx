@@ -1,11 +1,20 @@
 export function createPageUrl(pageName, params = {}) {
-  // Convert page name to lowercase
-  let url = `/${pageName.toLowerCase()}`;
+  // Get current language from localStorage or use default
+  const language = (localStorage.getItem('selected_language') || 'English').toLowerCase();
   
-  // If there's a name parameter, add it as a path parameter (not a query parameter)
-  if (params.name) {
-    // Make sure to properly encode the parameter to handle special characters
-    url += `/${encodeURIComponent(params.name)}`;
+  // Start with language prefix
+  let url = `/${language}`;
+  
+  // Add the page name (if it's not the default page)
+  if (pageName && pageName.toLowerCase() !== 'sounds') {
+    url += `/${pageName.toLowerCase()}`;
+  }
+  
+  // Add URL parameters if provided
+  if (params.sound_id) {
+    url += `/${encodeURIComponent(params.sound_id)}`;
+  } else if (params.slug) {
+    url += `/${encodeURIComponent(params.slug)}`;
   }
   
   return url;

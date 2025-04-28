@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { LogIn, LogOut, Trophy, Star, User, Loader2 } from "lucide-react";
+import { LogIn, LogOut, Trophy, Star, User, Loader2, BookOpen } from "lucide-react";
 
 export default function Header({
   user,
@@ -22,13 +22,21 @@ export default function Header({
         <p className="text-gray-600 mt-2">Go crazy with looping brainrot meme sounds with funny effects</p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap justify-center">
+        {/* Blog Link - Always visible */}
+        <Link to={createPageUrl("blog")}>
+          <Button variant="outline" className="bg-white/50 backdrop-blur-sm">
+            <BookOpen className="w-5 h-5 mr-2 text-purple-500" />
+            Blog
+          </Button>
+        </Link>
+
         {user && (
           <>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link to={createPageUrl("SavedSounds")}>
+                  <Link to={createPageUrl("savedsounds")}>
                     <Button variant="outline" className="bg-white/50 backdrop-blur-sm">
                       <Star className="w-5 h-5 mr-2 text-yellow-500" />
                       Saved
@@ -46,7 +54,7 @@ export default function Header({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link to={createPageUrl("Leaderboard")}>
+                  <Link to={createPageUrl("leaderboard")}>
                     <Button variant="outline" className="bg-white/50 backdrop-blur-sm">
                       <Trophy className="w-5 h-5 mr-2 text-yellow-500" />
                       Leaderboard

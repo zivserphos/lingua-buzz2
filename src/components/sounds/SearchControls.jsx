@@ -10,17 +10,18 @@ export default function SearchControls({
   onSearch 
 }) {
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-center mb-6">
-      <div className="flex-1 w-full">
+    <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="flex-1">
         <Search 
-          value={searchTerm} 
-          onChange={onSearchChange} 
+          value={searchTerm}
+          onChange={onSearchChange}
           onSearch={onSearch}
         />
       </div>
+      
       <LanguageSelector 
-        currentLanguage={language} 
-        onLanguageChange={onLanguageChange} 
+        currentLanguage={language}
+        onLanguageChange={onLanguageChange}
       />
     </div>
   );
