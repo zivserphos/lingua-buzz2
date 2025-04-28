@@ -4,11 +4,10 @@ import { blogPosts } from "./blogposts";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Helmet } from "react-helmet-async"; // Fixed import
-import { createPageUrl } from "@/utils";
+import { Helmet } from "react-helmet-async";
 
 export default function BlogPost() {
-  const { slug, language } = useParams();
+  const { slug } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
   
@@ -18,7 +17,7 @@ export default function BlogPost() {
       setPost(foundPost);
     } else {
       // Redirect to blog list if post not found
-      navigate(createPageUrl("blog"));
+      navigate("/blog");
     }
   }, [slug, navigate]);
   
@@ -44,7 +43,7 @@ export default function BlogPost() {
       
       <div className="max-w-3xl mx-auto">
         <div className="mb-6">
-          <Link to={createPageUrl("blog")}>
+          <Link to="/blog">
             <Button variant="ghost" size="sm" className="flex items-center gap-2">
               <ArrowLeft className="w-4 h-4" />
               Back to Blog
@@ -67,7 +66,7 @@ export default function BlogPost() {
           <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
           
           <div className="mt-8 border-t pt-4">
-            <Link to={createPageUrl("blog")}>
+            <Link to="/blog">
               <Button>
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Read more articles

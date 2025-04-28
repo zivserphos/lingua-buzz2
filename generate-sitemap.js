@@ -3,6 +3,7 @@ import { createWriteStream } from 'fs';
 import { writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { blogPosts } from './src/components/blog/blogposts.js';
 
 // Get current directory equivalent to __dirname in CommonJS
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -49,6 +50,18 @@ async function generateSitemap() {
     smStream.write({ url: '/terms-of-use', changefreq: 'monthly', priority: 0.3 });
     smStream.write({ url: '/disclaimer', changefreq: 'monthly', priority: 0.3 });
     smStream.write({ url: '/community-guidelines', changefreq: 'monthly', priority: 0.3 });
+    
+    // Add blog routes (non-language specific)
+    smStream.write({ url: '/blog', changefreq: 'weekly', priority: 0.8 });
+    
+    // Add individual blog posts
+    blogPosts.forEach(post => {
+      smStream.write({
+        url: `/blog/${post.slug}`,
+        changefreq: 'monthly',
+        priority: 0.7
+      });
+    });
 
     // Add language-specific routes
     SUPPORTED_LANGUAGES.forEach(language => {
@@ -62,10 +75,12 @@ async function generateSitemap() {
       // Each static route with language prefix
       STATIC_ROUTES.forEach(route => {
         // Skip policy pages since we already added them
+        // Also skip blog routes since they're now non-language specific
         if (route.startsWith('/privacy-') || 
             route.startsWith('/terms-') || 
             route.startsWith('/disclaimer') || 
-            route.startsWith('/community-')) {
+            route.startsWith('/community-') ||
+            route.startsWith('/blog')) {
           return;
         }
 
@@ -87,18 +102,3 @@ async function generateSitemap() {
 }
 
 generateSitemap();
-
-
-    // If you have blog posts or other dynamic content, you could fetch and add them here
-    // For example:
-    // const blogPosts = await fetchBlogPosts();
-    // blogPosts.forEach(post => {
-    //   SUPPORTED_LANGUAGES.forEach(language => {
-    //     smStream.write({
-    //       url: `/${language}/blog/${post.slug}`,
-    //       changefreq: 'weekly',
-    //       priority: 0.6,
-    //       lastmod: post.lastModified
-    //     });
-    //   });
-    // });

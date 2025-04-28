@@ -31,7 +31,8 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction, lang
   }, [sound?.image_url]);
 
 
-  const soundUrl = createPageUrl("MemeSound", { name: sound.id });
+  const soundUrl = `/${language.toLowerCase()}/memesound/${sound.id}`;
+
   const soundState = { 
     soundName: sound.name,
     soundId: sound.id,
@@ -149,8 +150,8 @@ export default function SoundCard({ sound, isAnonymousGuest, onInteraction, lang
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
               <Link 
-                to={soundUrl}
-                state={soundState}
+                to={createPageUrl("MemeSound", { sound_id: sound.id })}
+                state={{ soundName: sound.name }}
                 className="inline-flex"
               >
                 <Button

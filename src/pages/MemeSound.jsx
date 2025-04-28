@@ -67,6 +67,7 @@ export default function MemeSoundPage() {
   // Get the name parameter from the URL
   const params = useParams();
   const location = useLocation();
+  const currentLanguage = params.language || 'English';
 
   const handleSocialInteraction = (interactionType) => {
     console.log(`Social interaction attempted: ${interactionType}`);
@@ -80,8 +81,8 @@ export default function MemeSoundPage() {
   const decodedName = name ? decodeURIComponent(name) : '';
 
   // Get additional data from state if available (from SoundCard.jsx)
-  const soundName = location.state?.soundName;
-  const soundId = location.state?.soundId || decodedName;
+  const soundId = params.sound_id || location.state?.soundId || location.state?.sound_id;
+  const soundName = location.state?.soundName || '';
 
   const [sound, setSound] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -127,6 +128,14 @@ export default function MemeSoundPage() {
       localStorage.removeItem('current_session_id');
     };
   }, []);
+
+  useEffect(() => {
+    if (!soundId && !soundName) {
+      setError('Sound information required. Please select a sound from the main page.');
+      setLoading(false);
+    }
+  }, []);
+  
 
   useEffect(() => {
     // Refresh token every 50 minutes (tokens expire at 60 minutes)
@@ -284,8 +293,8 @@ export default function MemeSoundPage() {
 
   const fetchSoundDetails = async (retryCount = 0) => {
     // Parameter validation
-    if (!decodedName && !soundName && !soundId) {
-      setError('Sound information is required');
+    if (!soundId && !soundName) {
+      setError('Sound information required. Please select a sound from the main page.');
       setLoading(false);
       return;
     }
@@ -342,7 +351,7 @@ export default function MemeSoundPage() {
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           },
           body: JSON.stringify({
-            language: 'English',
+            language: currentLanguage,
             limit: 10,
             page: 1,
             search: searchTerm, // Use name as search parameter instead of id
