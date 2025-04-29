@@ -293,56 +293,56 @@ export default function MemeSoundPage() {
 
   const fetchSoundDetails = async (retryCount = 0) => {
     // Parameter validation
-    if (!soundId && !soundName) {
+    if (!soundId && !soundName && !decodedName) {
       setError('Sound information required. Please select a sound from the main page.');
       setLoading(false);
       return;
     }
-
+  
     // Prevent too many retries
     if (retryCount > 2) {
       setError('Failed after multiple attempts. Please try again later.');
       setLoading(false);
       return;
     }
-
+  
     // Offline detection
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your connection.');
       setLoading(false);
       return;
     }
-
+  
     setLoading(true);
-
+  
     try {
       console.log(
         `Fetching sound details for ID: ${soundId}, Name: ${
           soundName || 'Unknown'
-        }`
+        }, Language: ${currentLanguage}`
       );
-
+  
       // Get token from localStorage
       let accessToken = localStorage.getItem('access_token');
-
+  
       // If no token is available, try to refresh using the refresh token
       if (!accessToken) {
         const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
           accessToken = await refreshAccessToken(refreshToken);
         }
-
-        if (!accessToken) {
-          console.warn('No access token available. Request may fail with 401.');
-        }
       }
-
-      // SEARCH STRATEGY:
-
-      // 1. Search using sound name if available (preferred), otherwise use the URL parameter
-      const searchTerm = soundName || decodedName;
-
-      const primarySearchResponse = await fetch(
+  
+      // OPTIMIZED SEARCH STRATEGY:
+      // 1. Use sound_id as primary search parameter if available
+      // 2. Otherwise use soundName or decodedName
+      // 3. Always use the language from the URL
+  
+      // Determine the most specific search term we have
+      const searchTerm = soundId || soundName || decodedName;
+  
+      // Make a single API call with the best search term we have
+      const searchResponse = await fetch(
         'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
         {
           method: 'POST',
@@ -351,16 +351,16 @@ export default function MemeSoundPage() {
             ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
           },
           body: JSON.stringify({
-            language: currentLanguage,
-            limit: 10,
+            language: currentLanguage, // Always use language from URL
+            limit: 50, // Increase limit to ensure we can find the sound
             page: 1,
-            search: searchTerm, // Use name as search parameter instead of id
+            search: searchTerm,
           }),
         }
       );
-
+  
       // Handle 401 Unauthorized
-      if (primarySearchResponse.status === 401) {
+      if (searchResponse.status === 401) {
         const refreshToken = localStorage.getItem('refresh_token');
         if (refreshToken) {
           const newToken = await refreshAccessToken(refreshToken);
@@ -370,159 +370,54 @@ export default function MemeSoundPage() {
         }
         throw new Error('Authentication required. Please log in.');
       }
-
-      if (primarySearchResponse.ok) {
-        const searchData = await primarySearchResponse.json();
-        if (searchData.result?.success && searchData.result.data?.length > 0) {
-          // If we have the soundId, try to find an exact match
-          if (soundId) {
-            const exactMatch = searchData.result.data.find(
-              (s) => s.id === soundId
-            );
-            if (exactMatch) {
-              setSound(exactMatch);
-              setLoading(false);
-              setIsSaved(exactMatch.isSaved || false);
-              return;
-            }
-          }
-
-          // Otherwise use the first result
-          setSound(searchData.result.data[0]);
+  
+      if (!searchResponse.ok) {
+        throw new Error(`HTTP error! status: ${searchResponse.status}`);
+      }
+  
+      const searchData = await searchResponse.json();
+  
+      if (!searchData.result?.success || !searchData.result.data?.length) {
+        throw new Error(`Sound "${searchTerm}" not found`);
+      }
+  
+      // Find exact match if soundId is available
+      if (soundId) {
+        const exactMatch = searchData.result.data.find(
+          (s) => s.id === soundId
+        );
+        if (exactMatch) {
+          setSound(exactMatch);
           setLoading(false);
-          setIsSaved(searchData.result.data[0].isSaved || false);
+          setIsSaved(exactMatch.isSaved || false);
           return;
         }
       }
-
-      // 2. If first search failed and we're using a different search term than decodedName,
-      // try with decodedName as a fallback
-      if (searchTerm !== decodedName) {
-        const fallbackSearchResponse = await fetch(
-          'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              ...(accessToken
-                ? { Authorization: `Bearer ${accessToken}` }
-                : {}),
-            },
-            body: JSON.stringify({
-              language: 'English',
-              limit: 10,
-              page: 1,
-              search: decodedName,
-            }),
-          }
-        );
-
-        // Also check for 401 here
-        if (fallbackSearchResponse.status === 401) {
-          const refreshToken = localStorage.getItem('refresh_token');
-          if (refreshToken) {
-            const newToken = await refreshAccessToken(refreshToken);
-            if (newToken) {
-              return fetchSoundDetails(retryCount + 1);
-            }
-          }
-          throw new Error('Authentication required. Please log in.');
-        }
-
-        if (fallbackSearchResponse.ok) {
-          const fallbackData = await fallbackSearchResponse.json();
-          if (
-            fallbackData.result?.success &&
-            fallbackData.result.data?.length > 0
-          ) {
-            // Try to find the exact match by ID first
-            if (soundId) {
-              const exactMatch = fallbackData.result.data.find(
-                (s) => s.id === soundId
-              );
-              if (exactMatch) {
-                setSound(exactMatch);
-                setLoading(false);
-                setIsSaved(exactMatch.isSaved || false);
-                return;
-              }
-            }
-
-            setSound(fallbackData.result.data[0]);
-            setLoading(false);
-            setIsSaved(fallbackData.result.data[0].isSaved || false);
-            return;
-          }
-        }
-      }
-
-      // 3. Last resort: get all sounds and filter
-      const response = await fetch(
-        'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          },
-          body: JSON.stringify({
-            language: 'English',
-            limit: 100,
-            page: 1,
-            search: '', // Empty search to get all sounds
-          }),
-        }
-      );
-
-      // Check for 401 one more time
-      if (response.status === 401) {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (refreshToken) {
-          const newToken = await refreshAccessToken(refreshToken);
-          if (newToken) {
-            return fetchSoundDetails(retryCount + 1);
-          }
-        }
-        throw new Error('Authentication required. Please log in.');
-      }
-
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
-
-      const data = await response.json();
-
-      if (!data.result?.success) throw new Error('Invalid response format');
-
-      // First try to find by ID
-      let foundSound = data.result.data?.find((sound) => sound.id === soundId);
-
-      // If not found by ID, try by name
-      if (!foundSound && soundName) {
-        foundSound = data.result.data?.find(
-          (sound) => sound.name.toLowerCase() === soundName.toLowerCase()
+      
+      let bestMatch = null;
+      
+      if (params.sound_id) {
+        bestMatch = searchData.result.data.find(sound => 
+          sound.id.includes(params.sound_id) || 
+          sound.name.toLowerCase().includes(params.sound_id.toLowerCase())
         );
       }
-
-      // Try partial name match
-      if (!foundSound) {
-        foundSound = data.result.data?.find(
-          (sound) =>
-            sound.name.toLowerCase().includes(decodedName.toLowerCase()) ||
-            (soundName &&
-              sound.name.toLowerCase().includes(soundName.toLowerCase()))
-        );
+      
+      // If still no match, use the first result
+      if (!bestMatch && searchData.result.data.length > 0) {
+        bestMatch = searchData.result.data[0];
       }
-
-      if (foundSound) {
-        setSound(foundSound);
-        setIsSaved(foundSound.isSaved || false);
+      
+      if (bestMatch) {
+        setSound(bestMatch);
+        setLoading(false);
+        setIsSaved(bestMatch.isSaved || false);
       } else {
         throw new Error(`Sound "${searchTerm}" not found`);
       }
     } catch (err) {
       console.error('Error fetching sound:', err);
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
