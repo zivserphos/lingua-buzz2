@@ -92,7 +92,7 @@ async function generateSitemap() {
 
       // Add language-specific memesound pages with sound IDs for popular sounds
       // This helps search engines discover your most important sound pages
-      const popularSoundIds = ['popular-sound-1', 'popular-sound-2', 'viral-sound-1'];
+      const popularSoundIds = ['eatin_the_dogs', 'yes_yes_skibidi_yes', 'tralalero_tralala'];
       popularSoundIds.forEach(soundId => {
         smStream.write({
           url: `/${language}/memesound/${soundId}`,
