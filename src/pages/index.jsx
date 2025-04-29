@@ -53,20 +53,27 @@ function LanguageRedirectWithParam({ paramName, redirectPath }) {
   const navigate = useNavigate();
   const params = useParams();
   const location = useLocation();
-  
+
   useEffect(() => {
-    const userLanguage = localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
+    const userLanguage =
+      localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
     const paramValue = params[paramName];
-    
+
     if (paramValue) {
       // Create URL with parameter
-      navigate(`/${userLanguage.toLowerCase()}/${redirectPath}/${paramValue}${location.search}`);
+      navigate(
+        `/${userLanguage.toLowerCase()}/${redirectPath}/${paramValue}${
+          location.search
+        }`
+      );
     } else {
       // Create URL without parameter
-      navigate(`/${userLanguage.toLowerCase()}/${redirectPath}${location.search}`);
+      navigate(
+        `/${userLanguage.toLowerCase()}/${redirectPath}${location.search}`
+      );
     }
   }, [navigate, redirectPath, paramName, params, location.search]);
-  
+
   return null;
 }
 
@@ -111,19 +118,19 @@ function LanguageRedirect({ pathSuffix = '' }) {
   const location = useLocation();
 
   useEffect(() => {
-    const userLanguage = localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
+    const userLanguage =
+      localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
     console.log(`LanguageRedirect: Redirecting with language ${userLanguage}`);
 
     // If there's a sound_id parameter in the URL, preserve it
     if (params.sound_id) {
       navigate(
-        `/${userLanguage.toLowerCase()}/memesound/${params.sound_id}${location.search}`
+        `/${userLanguage.toLowerCase()}/memesound/${params.sound_id}${
+          location.search
+        }`
       );
-    } else if (params.slug) {
-      navigate(
-        `/${userLanguage.toLowerCase()}/blog/${params.slug}${location.search}`
-      );
-    } else {
+    }
+    else {
       const path = pathSuffix
         ? `/${userLanguage.toLowerCase()}/${pathSuffix}`
         : `/${userLanguage.toLowerCase()}`;
@@ -152,66 +159,39 @@ function PagesContent() {
         <meta property='og:title' content={`${currentPage} | Brainrot Memes`} />
       </Helmet>
       <Routes>
-        {/* Root redirect */}
-        <Route path='/' element={<LanguageRedirect />} exact />
+  {/* Root redirect */}
+  <Route path='/' element={<LanguageRedirect />} exact />
 
-        {/* Language-specific routes */}
-        <Route path='/:language' element={<Sounds />} exact />
-        <Route path='/:language/sounds' element={<Sounds />} />
-        <Route path='/:language/leaderboard' element={<Leaderboard />} />
-        <Route path='/:language/savedsounds' element={<SavedSounds />} />
-        <Route path='/:language/memesound' element={<MemeSound />} />
-        <Route path='/:language/memesound/:sound_id' element={<MemeSound />} />
-        <Route path='/:language/blog' element={<BlogList />} />
-        <Route path='/:language/blog/:slug' element={<BlogPost />} />
+  {/* Language-specific routes */}
+  <Route path='/:language' element={<Sounds />} exact />
+  <Route path='/:language/sounds' element={<Sounds />} />
+  <Route path='/:language/leaderboard' element={<Leaderboard />} />
+  <Route path='/:language/savedsounds' element={<SavedSounds />} />
+  <Route path='/:language/memesound' element={<MemeSound />} />
+  <Route path='/:language/memesound/:sound_id' element={<MemeSound />} />
 
-        {/* Legacy routes for backward compatibility */}
-        <Route
-          path='/sounds'
-          element={<LanguageRedirect pathSuffix='sounds' />}
-        />
-        <Route
-          path='/leaderboard'
-          element={<LanguageRedirect pathSuffix='leaderboard' />}
-        />
-        <Route
-          path='/savedsounds'
-          element={<LanguageRedirect pathSuffix='savedsounds' />}
-        />
-        <Route
-          path='/memesound'
-          element={<LanguageRedirect pathSuffix='memesound' />}
-        />
-        {/* Important fix for sound_id parameter handling */}
-        <Route
-          path='/memesound/:sound_id'
-          element={
-            <LanguageRedirectWithParam
-              paramName='sound_id'
-              redirectPath='memesound'
-            />
-          }
-        />
-        <Route path='/blog' element={<LanguageRedirect pathSuffix='blog' />} />
-        <Route 
-          path='/blog/:slug'
-          element={
-            <LanguageRedirectWithParam
-              paramName='slug'
-              redirectPath='blog'
-            />
-          }
-        />
+  {/* Legacy routes for backward compatibility */}
+  <Route path='/sounds' element={<LanguageRedirect pathSuffix='sounds' />} />
+  <Route path='/leaderboard' element={<LanguageRedirect pathSuffix='leaderboard' />} />
+  <Route path='/savedsounds' element={<LanguageRedirect pathSuffix='savedsounds' />} />
+  <Route path='/memesound' element={<LanguageRedirect pathSuffix='memesound' />} />
+  <Route path='/memesound/:sound_id' element={
+    <LanguageRedirectWithParam paramName='sound_id' redirectPath='memesound' />
+  } />
+  
+  {/* Non-language specific blog routes */}
+  <Route path='/blog' element={<BlogList />} />
+  <Route path='/blog/:slug' element={<BlogPost />} />
 
-        {/* Policy pages */}
-        <Route path='/privacy-policy' element={<PolicyPage />} />
-        <Route path='/terms-of-use' element={<PolicyPage />} />
-        <Route path='/disclaimer' element={<PolicyPage />} />
-        <Route path='/community-guidelines' element={<PolicyPage />} />
+  {/* Policy pages */}
+  <Route path='/privacy-policy' element={<PolicyPage />} />
+  <Route path='/terms-of-use' element={<PolicyPage />} />
+  <Route path='/disclaimer' element={<PolicyPage />} />
+  <Route path='/community-guidelines' element={<PolicyPage />} />
 
-        {/* Catch-all route */}
-        <Route path='*' element={<Navigate to='/' replace />} />
-      </Routes>
+  {/* Catch-all route */}
+  <Route path='*' element={<Navigate to='/' replace />} />
+</Routes>
     </Layout>
   );
 }
