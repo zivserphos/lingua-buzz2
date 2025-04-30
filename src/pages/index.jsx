@@ -58,9 +58,9 @@ function LanguageRedirectWithParam({ paramName, redirectPath }) {
     const userLanguage = localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
     const paramValue = params[paramName];
     
-    // Special case for blog - keep it non-language specific
-    if (redirectPath === 'blog') {
-      navigate(`/blog/${paramValue}${location.search}`);
+    // Special case for non-language specific routes
+    if (redirectPath === 'blog' || redirectPath === 'leaderboard' || redirectPath === 'savedsounds') {
+      navigate(`/${redirectPath}/${paramValue}${location.search}`);
       return;
     }
     
@@ -87,9 +87,9 @@ function _getCurrentPage(url) {
   // Extract the last part of the URL, ignoring language prefix
   const parts = url.split('/').filter((part) => part);
 
-  // Special handling for blog routes, which are non-language specific
-  if (parts[0] === 'blog') {
-    return 'Blog';
+  // Special handling for non-language specific routes
+  if (['blog', 'leaderboard', 'savedsounds'].includes(parts[0])) {
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   }
   
   // Check if the first part is a language - explicit object handling
@@ -125,9 +125,9 @@ function LanguageRedirect({ pathSuffix = '' }) {
     const userLanguage = localStorage.getItem('selected_language') || DEFAULT_LANGUAGE;
     console.log(`LanguageRedirect: Redirecting with language ${userLanguage}`);
 
-    // Special case for blog - keep it non-language specific
-    if (pathSuffix === 'blog') {
-      navigate(`/blog${location.search}`);
+    // Special case for non-language specific routes
+    if (['blog', 'leaderboard', 'savedsounds'].includes(pathSuffix)) {
+      navigate(`/${pathSuffix}${location.search}`);
       return;
     }
 
@@ -170,26 +170,28 @@ function PagesContent() {
         {/* Root redirect */}
         <Route path='/' element={<LanguageRedirect />} exact />
 
-        {/* Language-specific routes */}
+        {/* Language-specific routes for sounds and memesound */}
         <Route path='/:language' element={<Sounds />} exact />
         <Route path='/:language/sounds' element={<Sounds />} />
-        <Route path='/:language/leaderboard' element={<Leaderboard />} />
-        <Route path='/:language/savedsounds' element={<SavedSounds />} />
         <Route path='/:language/memesound' element={<MemeSound />} />
         <Route path='/:language/memesound/:sound_id' element={<MemeSound />} />
+        
+        {/* Legacy language-specific routes (will be redirected) */}
+        <Route path='/:language/leaderboard' element={<Navigate to="/leaderboard" replace />} />
+        <Route path='/:language/savedsounds' element={<Navigate to="/savedsounds" replace />} />
 
-        {/* Legacy routes for backward compatibility */}
+        {/* Direct routes without language prefix */}
+        <Route path='/leaderboard' element={<Leaderboard />} />
+        <Route path='/savedsounds' element={<SavedSounds />} />
+        <Route path='/blog' element={<BlogList />} />
+        <Route path='/blog/:slug' element={<BlogPost />} />
+
+        {/* Legacy route redirects */}
         <Route path='/sounds' element={<LanguageRedirect pathSuffix='sounds' />} />
-        <Route path='/leaderboard' element={<LanguageRedirect pathSuffix='leaderboard' />} />
-        <Route path='/savedsounds' element={<LanguageRedirect pathSuffix='savedsounds' />} />
         <Route path='/memesound' element={<LanguageRedirect pathSuffix='memesound' />} />
         <Route path='/memesound/:sound_id' element={
           <LanguageRedirectWithParam paramName='sound_id' redirectPath='memesound' />
         } />
-        
-        {/* Direct blog routes - no language prefix */}
-        <Route path='/blog' element={<BlogList />} />
-        <Route path='/blog/:slug' element={<BlogPost />} />
 
         {/* Policy pages */}
         <Route path='/privacy-policy' element={<PolicyPage />} />

@@ -40,11 +40,16 @@ export default function SoundGrid({
     };
   }, [loadingIndicatorRef, hasNextPage, loading, onLoadMore]);
 
+  // Filter out duplicates
+  const uniqueSounds = sounds.filter((sound, index, self) => 
+    index === self.findIndex(s => s.id === sound.id)
+  );
+
   return (
     <div className='flex-1 max-w-full'>
       {totalItems > 0 && (
         <div className='text-center text-gray-500 mb-4'>
-          Showing {sounds.length} of {totalItems} sounds
+          Showing {uniqueSounds.length} of {totalItems} sounds
         </div>
       )}
 
@@ -54,7 +59,8 @@ export default function SoundGrid({
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        {sounds.map((sound) => (
+        {/* Use uniqueSounds instead of sounds to avoid duplicate keys */}
+        {uniqueSounds.map((sound) => (
           <SoundCard
             key={sound.id}
             sound={sound}
@@ -65,7 +71,7 @@ export default function SoundGrid({
         ))}
       </motion.div>
 
-      {sounds.length === 0 && !loading && !initialLoading && (
+      {uniqueSounds.length === 0 && !loading && !initialLoading && (
         <div className='text-center py-12'>
           <p className='text-gray-500 text-lg'>No sounds found 😢</p>
           <p className='text-gray-400'>Try changing your search or language</p>
@@ -80,7 +86,7 @@ export default function SoundGrid({
         {loading && hasNextPage && (
           <Loader2 className='w-8 h-8 animate-spin text-purple-600' />
         )}
-        {!hasNextPage && sounds.length > 0 && (
+        {!hasNextPage && uniqueSounds.length > 0 && (
           <div className='text-gray-500 text-sm'>No more sounds to load</div>
         )}
       </div>
