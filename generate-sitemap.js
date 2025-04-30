@@ -17,17 +17,21 @@ const SUPPORTED_LANGUAGES = [
   "French", "Italian", "Turkish", "Hindi", "Hebrew"
 ].map(lang => lang.toLowerCase());
 
-// Define your routes (excluding dynamic routes that need parameters)
-const STATIC_ROUTES = [
-  '/sounds',
+// Define direct routes (no language prefix)
+const DIRECT_ROUTES = [
   '/leaderboard',
   '/savedsounds',
-  '/memesound',
   '/blog',
   '/privacy-policy',
   '/terms-of-use',
   '/disclaimer',
   '/community-guidelines'
+];
+
+// Define language-specific routes
+const LANGUAGE_ROUTES = [
+  '/sounds',
+  '/memesound'
 ];
 
 async function generateSitemap() {
@@ -44,14 +48,24 @@ async function generateSitemap() {
       priority: 1.0 
     });
 
-    // Add policy pages (non-language specific)
-    smStream.write({ url: '/privacy-policy', changefreq: 'monthly', priority: 0.3 });
-    smStream.write({ url: '/terms-of-use', changefreq: 'monthly', priority: 0.3 });
-    smStream.write({ url: '/disclaimer', changefreq: 'monthly', priority: 0.3 });
-    smStream.write({ url: '/community-guidelines', changefreq: 'monthly', priority: 0.3 });
-    
-    // Add blog routes (non-language specific)
-    smStream.write({ url: '/blog', changefreq: 'weekly', priority: 0.8 });
+    // Add direct routes (non-language specific)
+    DIRECT_ROUTES.forEach(route => {
+      // For policy pages
+      if (route.startsWith('/privacy-') || 
+          route.startsWith('/terms-') || 
+          route.startsWith('/disclaimer') || 
+          route.startsWith('/community-')) {
+        smStream.write({ url: route, changefreq: 'monthly', priority: 0.3 });
+      }
+      // For leaderboard and savedsounds
+      else if (route === '/leaderboard' || route === '/savedsounds') {
+        smStream.write({ url: route, changefreq: 'daily', priority: 0.7 });
+      }
+      // For blog
+      else if (route === '/blog') {
+        smStream.write({ url: route, changefreq: 'weekly', priority: 0.8 });
+      }
+    });
     
     // Add individual blog posts
     blogPosts.forEach(post => {
@@ -71,18 +85,8 @@ async function generateSitemap() {
         priority: 0.9
       });
 
-      // Each static route with language prefix
-      STATIC_ROUTES.forEach(route => {
-        // Skip policy pages since we already added them
-        // Also skip blog routes since they're now non-language specific
-        if (route.startsWith('/privacy-') || 
-            route.startsWith('/terms-') || 
-            route.startsWith('/disclaimer') || 
-            route.startsWith('/community-') ||
-            route.startsWith('/blog')) {
-          return;
-        }
-
+      // Each language-specific route
+      LANGUAGE_ROUTES.forEach(route => {
         smStream.write({
           url: `/${language}${route}`,
           changefreq: 'weekly',
@@ -91,7 +95,6 @@ async function generateSitemap() {
       });
 
       // Add language-specific memesound pages with sound IDs for popular sounds
-      // This helps search engines discover your most important sound pages
       const popularSoundIds = ['eatin_the_dogs', 'yes_yes_skibidi_yes', 'tralalero_tralala'];
       popularSoundIds.forEach(soundId => {
         smStream.write({
@@ -106,8 +109,6 @@ async function generateSitemap() {
     smStream.end();
     
     console.log('Sitemap generated successfully!');
-    
-    // You can also add a timestamp to track when the sitemap was last generated
     console.log(`Generated at: ${new Date().toISOString()}`);
   } catch (error) {
     console.error('Error generating sitemap:', error);
