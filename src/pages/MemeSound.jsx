@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createPageUrl } from '@/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Helmet } from 'react-helmet-async';
 import {
   ArrowLeft,
   Clock,
@@ -38,6 +39,13 @@ import {
 import AdvancedSettings from '../components/sounds/AdvancedSettings';
 import useAuth from '@/hooks/useAuth';
 import GuestDialog from '@/components/auth/GuestDialog';
+import {
+  getLocalizedDescription,
+  generateSoundStructuredData,
+  generateMetaTags,
+  generateHreflangTags,
+  getEngagementPrompts,
+} from '@/utils/languagesSeo';
 
 // Firebase config reference
 const firebaseConfig = {
@@ -81,7 +89,8 @@ export default function MemeSoundPage() {
   const decodedName = name ? decodeURIComponent(name) : '';
 
   // Get additional data from state if available (from SoundCard.jsx)
-  const soundId = params.sound_id || location.state?.soundId || location.state?.sound_id;
+  const soundId =
+    params.sound_id || location.state?.soundId || location.state?.sound_id;
   const soundName = location.state?.soundName || '';
 
   const [sound, setSound] = useState(null);
@@ -131,11 +140,12 @@ export default function MemeSoundPage() {
 
   useEffect(() => {
     if (!soundId && !soundName) {
-      setError('Sound information required. Please select a sound from the main page.');
+      setError(
+        'Sound information required. Please select a sound from the main page.'
+      );
       setLoading(false);
     }
   }, []);
-  
 
   useEffect(() => {
     // Refresh token every 50 minutes (tokens expire at 60 minutes)
@@ -190,6 +200,7 @@ export default function MemeSoundPage() {
     } catch (err) {
       console.error('Error preloading audio buffer:', err);
     }
+    getLocalizedDescription;
   };
 
   useEffect(() => {
@@ -294,37 +305,39 @@ export default function MemeSoundPage() {
   const fetchSoundDetails = async (retryCount = 0) => {
     // Parameter validation
     if (!soundId && !soundName && !decodedName) {
-      setError('Sound information required. Please select a sound from the main page.');
+      setError(
+        'Sound information required. Please select a sound from the main page.'
+      );
       setLoading(false);
       return;
     }
-  
+
     // Prevent too many retries
     if (retryCount > 2) {
       setError('Failed after multiple attempts. Please try again later.');
       setLoading(false);
       return;
     }
-  
+
     // Offline detection
     if (!navigator.onLine) {
       setError('You appear to be offline. Please check your connection.');
       setLoading(false);
       return;
     }
-  
+
     setLoading(true);
-  
+
     try {
       console.log(
         `Fetching sound details for ID: ${soundId}, Name: ${
           soundName || 'Unknown'
         }, Language: ${currentLanguage}`
       );
-  
+
       // Get token from localStorage
       let accessToken = localStorage.getItem('access_token');
-  
+
       // If no token is available, try to refresh using the refresh token
       if (!accessToken) {
         const refreshToken = localStorage.getItem('refresh_token');
@@ -332,15 +345,15 @@ export default function MemeSoundPage() {
           accessToken = await refreshAccessToken(refreshToken);
         }
       }
-  
+
       // OPTIMIZED SEARCH STRATEGY:
       // 1. Use sound_id as primary search parameter if available
       // 2. Otherwise use soundName or decodedName
       // 3. Always use the language from the URL
-  
+
       // Determine the most specific search term we have
       const searchTerm = soundId || soundName || decodedName;
-  
+
       // Make a single API call with the best search term we have
       const searchResponse = await fetch(
         'https://us-central1-meme-soundboard-viral-alarm.cloudfunctions.net/getAllSoundsMetadata',
@@ -358,7 +371,7 @@ export default function MemeSoundPage() {
           }),
         }
       );
-  
+
       // Handle 401 Unauthorized
       if (searchResponse.status === 401) {
         const refreshToken = localStorage.getItem('refresh_token');
@@ -370,22 +383,20 @@ export default function MemeSoundPage() {
         }
         throw new Error('Authentication required. Please log in.');
       }
-  
+
       if (!searchResponse.ok) {
         throw new Error(`HTTP error! status: ${searchResponse.status}`);
       }
-  
+
       const searchData = await searchResponse.json();
-  
+
       if (!searchData.result?.success || !searchData.result.data?.length) {
         throw new Error(`Sound "${searchTerm}" not found`);
       }
-  
+
       // Find exact match if soundId is available
       if (soundId) {
-        const exactMatch = searchData.result.data.find(
-          (s) => s.id === soundId
-        );
+        const exactMatch = searchData.result.data.find((s) => s.id === soundId);
         if (exactMatch) {
           setSound(exactMatch);
           setLoading(false);
@@ -393,21 +404,22 @@ export default function MemeSoundPage() {
           return;
         }
       }
-      
+
       let bestMatch = null;
-      
+
       if (params.sound_id) {
-        bestMatch = searchData.result.data.find(sound => 
-          sound.id.includes(params.sound_id) || 
-          sound.name.toLowerCase().includes(params.sound_id.toLowerCase())
+        bestMatch = searchData.result.data.find(
+          (sound) =>
+            sound.id.includes(params.sound_id) ||
+            sound.name.toLowerCase().includes(params.sound_id.toLowerCase())
         );
       }
-      
+
       // If still no match, use the first result
       if (!bestMatch && searchData.result.data.length > 0) {
         bestMatch = searchData.result.data[0];
       }
-      
+
       if (bestMatch) {
         setSound(bestMatch);
         setLoading(false);
@@ -422,10 +434,9 @@ export default function MemeSoundPage() {
     }
   };
 
-
   const handleToggleSave = async () => {
     if (isAnonymousGuest) {
-      handleSocialInteraction('save'); 
+      handleSocialInteraction('save');
       return;
     }
 
@@ -433,41 +444,43 @@ export default function MemeSoundPage() {
       setLoading(true);
       // Update UI optimistically
       setIsSaved(!isSaved);
-      
+
       const token = localStorage.getItem('access_token');
       if (!token) {
-          console.error('Authentication required');
-          return;
+        console.error('Authentication required');
+        return;
       }
-  
+
       // Use different endpoints for save vs unsave
-      const endpoint = isSaved 
-        ? 'https://unsavesound-stbfcg576q-uc.a.run.app' 
+      const endpoint = isSaved
+        ? 'https://unsavesound-stbfcg576q-uc.a.run.app'
         : 'https://savesound-stbfcg576q-uc.a.run.app';
-  
+
       // Send the request with the correct format
       const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: {
+            soundId: sound.id,
           },
-          body: JSON.stringify({
-              data: {
-                  soundId: sound.id,
-              }
-          }),
+        }),
       });
-  
+
       if (!response.ok) {
-          throw new Error(`Failed to ${isSaved ? 'unsave' : 'save'} sound`);
+        throw new Error(`Failed to ${isSaved ? 'unsave' : 'save'} sound`);
       }
-  
+
       const data = await response.json();
       if (!data.result?.success) {
-        throw new Error(data.result?.error || `Failed to ${isSaved ? 'unsave' : 'save'} sound`);
+        throw new Error(
+          data.result?.error || `Failed to ${isSaved ? 'unsave' : 'save'} sound`
+        );
       }
-      
+
       console.log(`Successfully ${isSaved ? 'unsaved' : 'saved'} sound`);
     } catch (error) {
       console.error('Error toggling save state:', error);
@@ -884,6 +897,85 @@ export default function MemeSoundPage() {
   return (
     <div className='min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6'>
       {/* Hidden audio element */}
+      <Helmet>
+        {/* Generate full SEO-optimized meta tags */}
+        {sound &&
+          (() => {
+            const soundMetadata = {
+              id: sound.id,
+              name: sound.name,
+              length: sound.length || 3,
+              viralityIndex: sound.virality_index,
+              hashtags: sound.hastags || [],
+              year: new Date().getFullYear().toString(),
+            };
+
+            const metaTags = generateMetaTags(soundMetadata, currentLanguage);
+
+            return (
+              <>
+                <title>{metaTags.title}</title>
+                <meta name='description' content={metaTags.description} />
+                <meta name='keywords' content={metaTags.keywords} />
+
+                {/* Open Graph tags */}
+                <meta property='og:title' content={metaTags.ogTitle} />
+                <meta
+                  property='og:description'
+                  content={metaTags.ogDescription}
+                />
+                <meta property='og:image' content={sound.image_url} />
+                <meta property='og:locale' content={metaTags.locale} />
+
+                {/* Twitter Card tags */}
+                <meta name='twitter:card' content='summary_large_image' />
+                <meta name='twitter:title' content={metaTags.twitterTitle} />
+                <meta
+                  name='twitter:description'
+                  content={metaTags.twitterDescription}
+                />
+                <meta name='twitter:image' content={sound.image_url} />
+
+                {/* Hashtag meta tags */}
+                {sound.hastags?.map((tag) => (
+                  <meta key={tag} property='article:tag' content={tag} />
+                ))}
+
+                {/* Canonical URL */}
+                <link
+                  rel='canonical'
+                  href={`https://brainrot-memes.com/${currentLanguage.toLowerCase()}/memesound/${
+                    sound.id
+                  }`}
+                />
+
+                {/* Hreflang tags for internationalization */}
+                {generateHreflangTags(soundMetadata).map(
+                  ({ hreflang, href }) => (
+                    <link
+                      key={hreflang}
+                      rel='alternate'
+                      hreflang={hreflang}
+                      href={href}
+                    />
+                  )
+                )}
+                <link
+                  rel='alternate'
+                  hreflang='x-default'
+                  href={`https://brainrot-memes.com/english/memesound/${sound.id}`}
+                />
+
+                {/* JSON-LD structured data */}
+                <script type='application/ld+json'>
+                  {JSON.stringify(
+                    generateSoundStructuredData(soundMetadata, currentLanguage)
+                  )}
+                </script>
+              </>
+            );
+          })()}
+      </Helmet>
       <audio
         ref={audioRef}
         onEnded={() => setIsPlaying(false)}
@@ -1170,6 +1262,11 @@ export default function MemeSoundPage() {
               isAnonymousGuest={isAnonymousGuest}
               onInteraction={handleSocialInteraction}
             />
+            <div className='mt-4 bg-purple-50 p-3 rounded-lg'>
+              <p className='text-purple-700 font-medium text-center'>
+                {getEngagementPrompts(currentLanguage.toLowerCase())[0]}
+              </p>
+            </div>
           </div>
         </Card>
       </div>
