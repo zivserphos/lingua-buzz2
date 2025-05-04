@@ -15,6 +15,7 @@ export default function BlogList() {
         <meta name="description" content="Read articles about meme sounds, viral audio clips, and internet culture." />
         <meta property="og:title" content="Blog | Brainrot Memes" />
         <meta property="og:description" content="Discover insights and guides about meme sounds and viral audio." />
+        <link rel="canonical" href="https://brainrot-memes.com/blog" />
       </Helmet>
       
       <div className="max-w-5xl mx-auto">

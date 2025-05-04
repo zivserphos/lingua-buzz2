@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
+import { Helmet } from "react-helmet-async";
 import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -128,6 +129,13 @@ export default function LeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6">
+       <Helmet>
+        <title>Leaderboard | Brainrot Memes</title>
+        <meta name='description' content="Check out the top users..." />
+        <meta property='og:title' content='Leaderboard | Brainrot Memes' />
+        <meta property='og:description' content='View the Sound Masters...' />
+        <link rel='canonical' href='https://brainrot-memes.com/leaderboard' />
+      </Helmet>
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-4 mb-8">
           <Link to="/sounds">

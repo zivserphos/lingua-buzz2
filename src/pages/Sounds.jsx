@@ -186,7 +186,7 @@ export default function SoundsPage() {
       />
 
       {/* Ad styles */}
-      <style jsx>{`
+      <style>{`
         .ad-container {
           min-height: 250px;
           background-color: rgba(255, 255, 255, 0.5);

@@ -76,6 +76,9 @@ async function generateSitemap() {
       });
     });
 
+    const popularSoundIds = ['eatin_the_dogs', 'yes_yes_skibidi_yes', 'tralalero_tralala'];
+
+
     // Add language-specific routes
     SUPPORTED_LANGUAGES.forEach(language => {
       // Root language route
@@ -84,7 +87,7 @@ async function generateSitemap() {
         changefreq: 'daily',
         priority: 0.9
       });
-
+    
       // Each language-specific route
       LANGUAGE_ROUTES.forEach(route => {
         smStream.write({
@@ -93,16 +96,17 @@ async function generateSitemap() {
           priority: 0.7
         });
       });
-
-      // Add language-specific memesound pages with sound IDs for popular sounds
-      const popularSoundIds = ['eatin_the_dogs', 'yes_yes_skibidi_yes', 'tralalero_tralala'];
-      popularSoundIds.forEach(soundId => {
-        smStream.write({
-          url: `/${language}/memesound/${soundId}`,
-          changefreq: 'monthly',
-          priority: 0.6
+    
+      // Add popular sound IDs only for English language
+      if (language === 'english') {
+        popularSoundIds.forEach(soundId => {
+          smStream.write({
+            url: `/${language}/memesound/${soundId}`,
+            changefreq: 'monthly',
+            priority: 0.6
+          });
         });
-      });
+      }
     });
 
     // Close the stream and finalize the sitemap
