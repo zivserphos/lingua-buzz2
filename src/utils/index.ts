@@ -10,7 +10,7 @@ export function createPageUrl(pageName: string, params: { sound_id?: string; slu
         return '/blog';
     }
     
-    // For MemeSound with a sound ID parameter
+    // For MemeSound with a sound ID parameter.
     if (pageName === "MemeSound" || pageName.toLowerCase() === "memesound") {
         const soundIdentifier = params.sound_id || params.name;
         if (soundIdentifier) {
