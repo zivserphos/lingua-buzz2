@@ -1,7 +1,8 @@
-import React, { useRef, useCallback, useState } from 'react'; // Add useCallback
+import React, { useRef, useCallback, useState, useMemo } from 'react'; // Add useMemo
 import { motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Helmet } from 'react-helmet-async'; // Add Helmet import
 
 // Ads components
 import BottomFixedAd from '@/components/ads/BottomFixedAd';
@@ -22,6 +23,9 @@ import ErrorMessage from '@/components/sounds/ErrorMessage';
 import useAuth from '@/hooks/useAuth';
 import useSoundsData from '@/hooks/useSoundsData';
 import useAdSense from '@/hooks/useAdSense';
+
+// SEO utilities
+import { LANGUAGE_SEO_DATA } from '@/utils/languagesSeo';
 
 export default function SoundsPage() {
   const loadingIndicatorRef = useRef(null);
@@ -60,10 +64,82 @@ export default function SoundsPage() {
     fetchSounds,
     handleSearchInput,
     handleLanguageChange,
-    handleExplicitSearch, // Use explicit search handler
+    handleExplicitSearch,
     hasNextPage,
     currentPage,
   } = useSoundsData(idToken);
+
+  // Generate SEO metadata based on current language
+  const seoData = useMemo(() => {
+    const normalizedLanguage = language.toLowerCase();
+    const languageData = LANGUAGE_SEO_DATA[normalizedLanguage] || LANGUAGE_SEO_DATA.english;
+    
+    // Get random terms for variety in SEO content
+    const getRandomItem = (array) => array[Math.floor(Math.random() * array.length)];
+    const emotion = getRandomItem(languageData.emotions || []);
+    const trendTerm = getRandomItem(languageData.trendTerms || []);
+    
+    // Set titles and descriptions based on language
+    const titles = {
+      english: `Sounds | Brainrot Memes Funny Meme Sounds & Audio Effects | Download Free ${searchTerm ? `${searchTerm} ` : ''}Sound Effects`,
+      spanish: `Sonidos Graciosos de Memes y Efectos de Audio | Descarga ${searchTerm ? `${searchTerm} ` : ''}Gratis`,
+      portuguese: `Sons Engraçados de Memes e Efeitos de Áudio | Baixe ${searchTerm ? `${searchTerm} ` : ''}Grátis`,
+      german: `Lustige Meme-Sounds & Audio-Effekte | Kostenlose ${searchTerm ? `${searchTerm} ` : ''}Soundeffekte`,
+      russian: `Смешные Звуки Мемов и Аудио Эффекты | Скачать ${searchTerm ? `${searchTerm} ` : ''}Бесплатно`,
+      arabic: `أصوات ميمز مضحكة وتأثيرات صوتية | تنزيل ${searchTerm ? `${searchTerm} ` : ''}مجاناً`,
+      japanese: `おもしろミーム音とオーディオ効果 | 無料${searchTerm ? `${searchTerm} ` : ''}サウンドをダウンロード`,
+      korean: `재미있는 밈 소리 및 오디오 효과 | 무료 ${searchTerm ? `${searchTerm} ` : ''}사운드 다운로드`,
+      vietnamese: `Âm Thanh Meme Hài Hước & Hiệu Ứng Âm Thanh | Tải ${searchTerm ? `${searchTerm} ` : ''}Miễn Phí`,
+      chinese: `搞笑模因声音和音频效果 | 免费下载${searchTerm ? `${searchTerm} ` : ''}音效`,
+      french: `Sons de Mèmes Drôles et Effets Audio | Téléchargez ${searchTerm ? `${searchTerm} ` : ''}Gratuitement`,
+      italian: `Suoni Divertenti di Meme ed Effetti Audio | Scarica ${searchTerm ? `${searchTerm} ` : ''}Gratis`,
+      turkish: `Komik Meme Sesleri ve Ses Efektleri | Ücretsiz ${searchTerm ? `${searchTerm} ` : ''}İndirin`,
+      hindi: `मजेदार मीम साउंड और ऑडियो इफेक्ट्स | मुफ्त ${searchTerm ? `${searchTerm} ` : ''}डाउनलोड करें`,
+      hebrew: `הקלטות מצחיקות ומוכרות שכל ישראלי מכיר , מתאים לערב מצוין עם החבר׳ה , סתלבט ללא גבולות רק לצחוק , כל הסאונדים הכי מטומטמים מרוכזים במקום אחד , מרכז הסתלבט הישראלי ,`
+
+    };
+    
+    const descriptions = {
+      english: `Browse and download ${emotion} meme sounds, audio effects and clips. Perfect for TikTok, Reels, and YouTube Shorts. Create viral content with our ${trendTerm} sound collection.`,
+      spanish: `Explora y descarga sonidos ${emotion} de memes, efectos de audio y clips. Perfectos para TikTok, Reels y YouTube Shorts. Crea contenido viral con nuestra colección de sonidos ${trendTerm}.`,
+      portuguese: `Navegue e baixe sons ${emotion} de memes, efeitos de áudio e clipes. Perfeitos para TikTok, Reels e YouTube Shorts. Crie conteúdo viral com nossa coleção de sons ${trendTerm}.`,
+      // Add other languages similarly...
+    };
+    
+    // Get description for current language or fallback to English
+    const description = descriptions[normalizedLanguage] || descriptions.english;
+    const title = titles[normalizedLanguage] || titles.english;
+    
+    return {
+      title,
+      description,
+      canonical: `https://brainrot-memes.com/${language}/sounds${searchTerm ? `?q=${encodeURIComponent(searchTerm)}` : ''}`,
+      language
+    };
+  }, [language, searchTerm]);
+
+  // Generate structured data for sounds collection
+  const structuredData = useMemo(() => {
+    return JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": seoData.title,
+      "description": seoData.description,
+      "url": seoData.canonical,
+      "inLanguage": language === 'english' ? 'en' : language.substring(0, 2),
+      "numberOfItems": totalItems,
+      "itemListElement": sounds.slice(0, 10).map((sound, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "item": {
+          "@type": "AudioObject",
+          "name": sound.name,
+          "contentUrl": sound.audioUrl,
+          "encodingFormat": "audio/mpeg"
+        }
+      }))
+    });
+  }, [sounds, totalItems, seoData, language]);
 
   // NEW: Add callback for loading more items
   const handleLoadMore = useCallback(() => {
@@ -80,6 +156,30 @@ export default function SoundsPage() {
 
   return (
     <div className='min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50'>
+      {/* Add Helmet for SEO */}
+      <Helmet>
+        <title>{seoData.title}</title>
+        <meta name="description" content={seoData.description} />
+        <link rel="canonical" href={seoData.canonical} />
+        <html lang={language === 'english' ? 'en' : language.substring(0, 2)} />
+        
+        {/* Open Graph / Social Media */}
+        <meta property="og:title" content={seoData.title} />
+        <meta property="og:description" content={seoData.description} />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={seoData.canonical} />
+        <meta property="og:image" content="https://brainrot-memes.com/og-images/sounds-collection.jpg" />
+        
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={seoData.title} />
+        <meta name="twitter:description" content={seoData.description} />
+        <meta name="twitter:image" content="https://brainrot-memes.com/og-images/sounds-collection.jpg" />
+        
+        {/* Structured Data */}
+        <script type="application/ld+json">{structuredData}</script>
+      </Helmet>
+
       {/* <BottomFixedAd /> */}
 
       <div className='max-w-[1600px] mx-auto px-4 py-8'>
@@ -94,7 +194,7 @@ export default function SoundsPage() {
           onClose={() => setShowAuthBanner(false)}
         />
 
-        {/* Header with title and auth buttons */}
+        {/* Rest of the components remain unchanged */}
         <Header
           user={user}
           isAnonymousGuest={isAnonymousGuest}
@@ -104,16 +204,14 @@ export default function SoundsPage() {
           onSignOutClick={handleSignOut}
         />
 
-        {/* Search and language controls */}
         <SearchControls
           searchTerm={searchTerm}
           language={language}
           onSearchChange={handleSearchInput}
           onLanguageChange={handleLanguageChange}
-          onSearch={handleExplicitSearch} // FIXED: Use handleExplicitSearch
+          onSearch={handleExplicitSearch}
         />
 
-        {/* Error message */}
         {error && (
           <ErrorMessage
             error={error}
@@ -121,7 +219,6 @@ export default function SoundsPage() {
           />
         )}
 
-        {/* Loading state or content */}
         {initialLoading ? (
           <div className='flex flex-col justify-center items-center min-h-[300px]'>
             <Loader2 className='w-10 h-10 animate-spin text-purple-600 mb-4' />
@@ -139,7 +236,6 @@ export default function SoundsPage() {
           </div>
         ) : (
           <div className='flex'>
-            {/* LEFT SIDE AD */}
             <div
               className='hidden xl:block fixed left-0 top-1/2 transform -translate-y-1/2 ml-4'
               style={{ width: '160px', zIndex: 40 }}
@@ -147,7 +243,6 @@ export default function SoundsPage() {
               <LeftSideAd />
             </div>
 
-            {/* MAIN CONTENT */}
             <SoundGrid
               sounds={sounds}
               loading={loading}
@@ -158,11 +253,10 @@ export default function SoundsPage() {
               onShowAuthBanner={() => setShowAuthBanner(true)}
               onShowGuestDialog={handleSocialInteraction}
               initialLoading={initialLoading}
-              onLoadMore={handleLoadMore} // FIXED: Add onLoadMore prop
+              onLoadMore={handleLoadMore}
               language={language}
             />
 
-            {/* RIGHT SIDE AD */}
             <div
               className='hidden xl:block fixed right-0 top-1/2 transform -translate-y-1/2 mr-4'
               style={{ width: '160px', zIndex: 40 }}
@@ -173,7 +267,6 @@ export default function SoundsPage() {
         )}
       </div>
 
-      {/* Guest Username Dialog */}
       <GuestDialog
         open={showGuestDialog}
         isAnonymousGuest={isAnonymousGuest}
@@ -185,7 +278,6 @@ export default function SoundsPage() {
         onGoogleSignIn={handleGoogleSignIn}
       />
 
-      {/* Ad styles */}
       <style>{`
         .ad-container {
           min-height: 250px;
