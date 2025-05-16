@@ -55,41 +55,42 @@ const fetchUserData = async () => {
     fetchUserData();
   };
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* Header with profile button */}
-      <header className="bg-white shadow-sm p-3 flex justify-between items-center">
-        <div>
-          {/* Your app name/logo would go here */}
-          <Link to="/" className="text-xl font-bold text-purple-600">
-            LinguaBuzz
-          </Link>
-        </div>
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={handleOpenProfile}
-          className="flex items-center gap-2"
-        >
-          <User className="h-4 w-4" />
-          Profile
-        </Button>
-      </header>
-
-      {/* Main content */}
-      <div className="flex-grow">
-        {children}
+return (
+  <div className="min-h-screen flex flex-col">
+    {/* Comment out the header section below */}
+    {/*
+    <header className="bg-white shadow-sm p-3 flex justify-between items-center">
+      <div>
+        <Link to="/" className="text-xl font-bold text-purple-600">
+          LinguaBuzz
+        </Link>
       </div>
-      
-      {/* Profile Dialog */}
-      <ProfileDialog 
-        open={profileOpen}
-        onOpenChange={setProfileOpen}
-        userData={userData}
-        onProfileUpdated={handleProfileUpdated}
-      />
-      
-      <Footer />
+      <Button 
+        variant="ghost" 
+        size="sm"
+        onClick={handleOpenProfile}
+        className="flex items-center gap-2"
+      >
+        <User className="h-4 w-4" />
+        Profile
+      </Button>
+    </header>
+    */}
+
+    {/* Main content */}
+    <div className="flex-grow">
+      {children}
     </div>
-  );
+    
+    {/* Profile Dialog */}
+    <ProfileDialog 
+      open={profileOpen}
+      onOpenChange={setProfileOpen}
+      userData={userData}
+      onProfileUpdated={handleProfileUpdated}
+    />
+    
+    <Footer />
+  </div>
+);
 }

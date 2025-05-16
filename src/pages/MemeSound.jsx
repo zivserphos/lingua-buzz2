@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { createPageUrl } from '@/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,13 +16,13 @@ import {
   Volume2,
   VolumeX,
   Trophy,
-  ChevronDown,
-  ChevronUp,
-  Repeat,
+  AlertCircle,
   Star,
   Sparkles,
 } from 'lucide-react';
+import useStatsApplier from '@/hooks/stats-applier';
 import LeaderboardModal from '../components/sounds/LeaderboardModal';
+import { fetchSoundLeaderboard } from '../components/services/LeaderboardService';
 import SocialSection from '../components/sounds/SocialSection';
 import {
   Tooltip,
@@ -31,11 +30,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import AdvancedSettings from '../components/sounds/AdvancedSettings';
 import useAuth from '@/hooks/useAuth';
 import GuestDialog from '@/components/auth/GuestDialog';
@@ -103,9 +97,9 @@ export default function MemeSoundPage() {
   const [volume, setVolume] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [statsUpdated, setStatsUpdated] = useState(false);
-  const [updatingStats, setUpdatingStats] = useState(false);
+  // const [elapsedTime, setElapsedTime] = useState(0);
+  // const [statsUpdated, setStatsUpdated] = useState(false);
+  // const [updatingStats, setUpdatingStats] = useState(false);
 
   // Leaderboard state
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -124,12 +118,52 @@ export default function MemeSoundPage() {
 
   // Audio refs
   const audioRef = useRef(null);
-  const timerRef = useRef(null);
-  const statsUpdateSent = useRef(false);
   const audioContextRef = useRef(null);
   const audioSourcesRef = useRef([]);
   const audioBufferRef = useRef(null);
   const gainNodeRef = useRef(null);
+
+  const {
+    elapsedTime,
+    statsUpdated,
+    updatingStats,
+    formattedTime,
+    canApplyStats,
+    isEligibleUser,
+    applyStats,
+    startTimer,
+    stopTimer,
+    reset: resetStats,
+  } = useStatsApplier({
+    soundId: sound?.id,
+    language: sound?.language || currentLanguage,
+    effectUsed: echoCount > 0 ? `echo_${echoCount}` : null,
+  });
+
+  const handleShowLeaderboard = async () => {
+    try {
+      setLoading(true);
+
+      // Check if sound has an id
+      if (!sound?.id) {
+        console.error('Sound ID is required');
+        return;
+      }
+
+      const leaderboardData = await fetchSoundLeaderboard(sound.id);
+
+      // Set the leaderboard stats to show in the modal
+      setLeaderboardStats(leaderboardData.leaderboard || []);
+      setShowLeaderboard(true);
+    } catch (error) {
+      console.error('Error loading sound leaderboard:', error);
+      // Show empty leaderboard with error message
+      setLeaderboardStats([]);
+      setError('Failed to load leaderboard. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Clean up session ID on unmount
@@ -146,6 +180,12 @@ export default function MemeSoundPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isPlaying) {
+      stopTimer();
+    }
+  }, [isPlaying]);
 
   useEffect(() => {
     // Refresh token every 50 minutes (tokens expire at 60 minutes)
@@ -202,42 +242,6 @@ export default function MemeSoundPage() {
     }
     getLocalizedDescription;
   };
-
-  useEffect(() => {
-    fetchSoundDetails();
-
-    // Mock leaderboard data
-    setLeaderboardStats([
-      {
-        user_email: 'meme.master@example.com',
-        listen_time: 7200,
-        crazy_mode_count: 42,
-      },
-      {
-        user_email: 'sound.lover@example.com',
-        listen_time: 3600,
-        crazy_mode_count: 25,
-      },
-      {
-        user_email: 'viral.king@example.com',
-        listen_time: 1800,
-        crazy_mode_count: 15,
-      },
-    ]);
-
-    // Cleanup on unmount
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-
-      // Only update stats if we played for some time and haven't already sent stats
-      if (elapsedTime > 0 && !statsUpdateSent.current) {
-        handleStatsUpdate(elapsedTime);
-        statsUpdateSent.current = true;
-      }
-    };
-  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -492,80 +496,6 @@ export default function MemeSoundPage() {
     }
   };
 
-  const handleStatsUpdate = async (listenTime) => {
-    if (listenTime < 2 || !sound?.id || statsUpdateSent.current) return;
-
-    try {
-      console.log('Updating stats:', { listenTime, soundId: sound.id });
-      setUpdatingStats(true);
-
-      // Track that we're sending stats to prevent duplicate sends
-      statsUpdateSent.current = true;
-
-      // Add a unique session ID to help prevent duplicate submissions
-      const sessionId =
-        localStorage.getItem('current_session_id') ||
-        `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-      // Store the session ID for this tab
-      if (!localStorage.getItem('current_session_id')) {
-        localStorage.setItem('current_session_id', sessionId);
-      }
-
-      // Calculate actual play time more accurately (to prevent client-side tampering)
-      const actualPlayTime = Math.min(listenTime, elapsedTime); // Can't be more than elapsed time
-
-      // Implement reasonable maximum values
-      const reasonableListenTime = Math.min(actualPlayTime, 7200); // Cap at 2 hours
-
-      const token = localStorage.getItem('access_token');
-      if (!token) {
-        console.error('Authentication required');
-        return;
-      }
-
-      // Include session ID and timestamp in request
-      const response = await fetch(
-        'https://updateuserstats-stbfcg576q-uc.a.run.app',
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            listenTime: reasonableListenTime,
-            soundsPlayed: 1,
-            soundId: sound.id,
-            language: sound.language || 'English',
-            effectUsed: echoCount > 0 ? `echo_${echoCount}` : null,
-            sessionDuration: reasonableListenTime,
-            sessionId: sessionId, // Include session ID to prevent duplicates
-            clientTimestamp: new Date().toISOString(), // Include timestamp
-          }),
-        }
-      );
-
-      // Clear session ID when component unmounts or on successful update
-      localStorage.removeItem('current_session_id');
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          console.log('Rate limited or duplicate submission detected');
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('Stats update response:', data);
-      setStatsUpdated(true);
-    } catch (err) {
-      console.error('Error updating stats:', err);
-    } finally {
-      setUpdatingStats(false);
-    }
-  };
-
   // Stop all audio sources
   const stopAllAudioSources = () => {
     audioSourcesRef.current.forEach((source) => {
@@ -658,6 +588,7 @@ export default function MemeSoundPage() {
             if (!isLooping) {
               setIsPlaying(false);
               stopAllAudioSources();
+              stopTimer();
             }
           };
         }
@@ -683,22 +614,19 @@ export default function MemeSoundPage() {
         audioRef.current.pause();
       }
       stopAllAudioSources();
-
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      stopTimer(); // Use hook method instead
       setIsPlaying(false);
     } else {
       // Start playback with or without echo
       await handlePlay();
-
-      // Start timer for stats tracking
-      timerRef.current = setInterval(() => {
-        setElapsedTime((prev) => prev + 1);
-      }, 1000);
-
+      startTimer(); // Use hook method instead
       setIsPlaying(true);
     }
+  };
+
+  // Replace handleApplyStats with the hook's method
+  const handleApplyStats = async () => {
+    await applyStats();
   };
 
   const handlePlaybackRateChange = (e) => {
@@ -782,32 +710,6 @@ export default function MemeSoundPage() {
         console.error('Error downloading audio:', error);
       });
   };
-
-  const handleApplyStats = async () => {
-    if (elapsedTime >= 120) {
-      await handleStatsUpdate(elapsedTime);
-    }
-  };
-
-  const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  // Reset stats on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-
-      // Only update stats if we played for some time and haven't already sent stats
-      if (elapsedTime >= 120 && !statsUpdateSent.current) {
-        handleStatsUpdate(elapsedTime);
-      }
-    };
-  }, [elapsedTime]);
 
   // If echo count changes and we're playing, restart to apply the new echo settings
   useEffect(() => {
@@ -978,7 +880,10 @@ export default function MemeSoundPage() {
       </Helmet>
       <audio
         ref={audioRef}
-        onEnded={() => setIsPlaying(false)}
+        onEnded={() => {
+          setIsPlaying(false);
+          stopTimer(); // Add this line to stop the timer
+        }}
         preload='auto'
       />
 
@@ -1022,19 +927,19 @@ export default function MemeSoundPage() {
             <div className='absolute bottom-0 left-0 w-full p-6 text-white'>
               <div className='flex justify-between items-center'>
                 <h1 className='text-4xl font-bold mb-2'>{sound.name}</h1>
-                <Button
-                  variant='outline'
-                  className='text-white/80 border-white/30 hover:bg-white/10'
-                  onClick={() => setShowLeaderboard(true)}
-                >
-                  <Trophy className='w-5 h-5 mr-2 text-yellow-400' />
-                  Leaderboard
-                </Button>
+              <Button
+                variant='outline'
+                className='text-white/80 border-white/30 hover:bg-white/10'
+                onClick={handleShowLeaderboard}
+              >
+                <Trophy className='w-5 h-5 mr-2 text-yellow-400' />
+                Leaderboard
+              </Button>
               </div>
               <div className='flex items-center gap-4 text-lg'>
                 <div className='flex items-center gap-2'>
                   <Clock className='w-5 h-5' />
-                  Current Session: {formatTime(elapsedTime)}
+                  Current Session: {formattedTime}
                 </div>
               </div>
             </div>
@@ -1061,11 +966,11 @@ export default function MemeSoundPage() {
                   className={`h-12 ${
                     statsUpdated
                       ? 'bg-green-600 hover:bg-green-700'
-                      : elapsedTime >= 120
+                      : canApplyStats
                       ? 'bg-purple-600 hover:bg-purple-700'
                       : 'bg-gray-400'
                   }`}
-                  disabled={elapsedTime < 120 || statsUpdated || updatingStats}
+                  disabled={!canApplyStats}
                 >
                   {updatingStats ? (
                     <Loader2 className='w-5 h-5 mr-2 animate-spin' />
@@ -1079,22 +984,40 @@ export default function MemeSoundPage() {
                     : 'Apply to Stats'}
                 </Button>
 
-                {/* Overlay div that serves as tooltip trigger - covers the entire button area */}
-                <TooltipProvider delayDuration={0}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div
-                        className='absolute inset-0 cursor-help'
-                        aria-label='Stats info'
-                      />
-                    </TooltipTrigger>
-                    <TooltipContent side='bottom' sideOffset={5}>
-                      <p>
-                        Listen for at least 2 minutes to apply to your stats
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                {!canApplyStats && (
+                  <TooltipProvider delayDuration={0}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`absolute inset-0 cursor-help ${
+                            statsUpdated ? 'pointer-events-none' : ''
+                          }`}
+                          aria-label='Stats info'
+                          style={{
+                            pointerEvents: statsUpdated ? 'none' : 'auto',
+                          }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side='bottom' sideOffset={5}>
+                        {!isEligibleUser ? (
+                          <p>Only Google sign-in users can apply to stats</p>
+                        ) : elapsedTime < 120 ? (
+                          <p>
+                            Listen for at least 2 minutes to apply to your stats
+                          </p>
+                        ) : (
+                          <p>Apply your listening time to your stats</p>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {error && (
+                  <div className='bg-red-50 p-3 rounded-md text-red-700 text-sm mt-2'>
+                    <AlertCircle className='w-4 h-4 inline mr-1' />
+                    {error}
+                  </div>
+                )}
               </div>
 
               <Button

@@ -19,10 +19,12 @@ import SearchControls from '@/components/sounds/SearchControls';
 import SoundGrid from '@/components/sounds/SoundGrid';
 import ErrorMessage from '@/components/sounds/ErrorMessage';
 
+
 // Custom hooks
 import useAuth from '@/hooks/useAuth';
 import useSoundsData from '@/hooks/useSoundsData';
 import useAdSense from '@/hooks/useAdSense';
+
 
 // SEO utilities
 import { LANGUAGE_SEO_DATA } from '@/utils/languagesSeo';
