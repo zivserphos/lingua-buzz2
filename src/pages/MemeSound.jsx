@@ -201,6 +201,16 @@ export default function MemeSoundPage() {
   }, []);
 
   useEffect(() => {
+    // Call fetchSoundDetails when the component mounts
+    fetchSoundDetails();
+
+    // Cleanup when unmounting
+    return () => {
+      stopAllAudioSources();
+    };
+  }, [soundId, soundName, decodedName, currentLanguage]); // Include dependencies to refetch if these change
+
+  useEffect(() => {
     if (audioRef.current && sound?.audio_url) {
       audioRef.current.src = sound.audio_url;
       audioRef.current.load();
@@ -927,14 +937,14 @@ export default function MemeSoundPage() {
             <div className='absolute bottom-0 left-0 w-full p-6 text-white'>
               <div className='flex justify-between items-center'>
                 <h1 className='text-4xl font-bold mb-2'>{sound.name}</h1>
-              <Button
-                variant='outline'
-                className='text-white/80 border-white/30 hover:bg-white/10'
-                onClick={handleShowLeaderboard}
-              >
-                <Trophy className='w-5 h-5 mr-2 text-yellow-400' />
-                Leaderboard
-              </Button>
+                <Button
+                  variant='outline'
+                  className='text-white/80 border-white/30 hover:bg-white/10'
+                  onClick={handleShowLeaderboard}
+                >
+                  <Trophy className='w-5 h-5 mr-2 text-yellow-400' />
+                  Leaderboard
+                </Button>
               </div>
               <div className='flex items-center gap-4 text-lg'>
                 <div className='flex items-center gap-2'>
