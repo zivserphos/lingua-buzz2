@@ -13,6 +13,10 @@ import {
   TooltipProvider,
 } from '@/components/ui/tooltip';
 import { fetchSoundLeaderboard } from '@/components/services/LeaderboardService';
+import {
+  generateSmallImageUrl,
+  generateMediumImageUrl,
+} from '@/utils/generateImageSizes';
 import LeaderboardModal from './LeaderboardModal';
 import SocialService from '@/components/services/SocialService';
 
@@ -157,27 +161,17 @@ export default function SoundCard({
     >
       <Card className='overflow-hidden bg-white/70 backdrop-blur-sm hover:bg-white/90 transition-all duration-300'>
         <CardContent className='p-0'>
-          <div className='relative'>
+          <div className='relative h-48 xs:h-40 overflow-hidden rounded-t-lg'>
             <img
-              src={sound.image_url}
+              src={generateSmallImageUrl(sound.image_url)}
+              srcSet={`${generateSmallImageUrl(sound.image_url)} 400w, ${
+                sound.image_url
+              } 800w`}
+              sizes='(max-width: 480px) 95vw, (max-width: 768px) 45vw, 25vw'
+              loading='lazy'
               alt={sound.name}
-              className={`w-full h-48 ${
-                isSquareImage ? 'object-fill' : 'object-cover'
-              }`}
+              className='w-full h-full object-cover transition-transform duration-300 group-hover:scale-105'
             />
-            <div className='absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
-            <div className='absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0'>
-              <Link
-                to={createPageUrl('MemeSound', { sound_id: sound.id })}
-                state={{ soundName: sound.name }}
-                className='inline-flex'
-              >
-                <Button className='bg-purple-600 hover:bg-purple-700' size='sm'>
-                  <Sparkles className='w-4 h-4 mr-2' />
-                  Go Crazy
-                </Button>
-              </Link>
-            </div>
           </div>
 
           <div className='p-4 space-y-3'>

@@ -54,11 +54,12 @@ export default function SoundGrid({
       )}
 
       <motion.div
-        className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+        className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
+        {/* Use uniqueSounds instead of sounds to avoid duplicate keys */}
         {uniqueSounds.map((sound) => (
           <SoundCard
             key={sound.id}

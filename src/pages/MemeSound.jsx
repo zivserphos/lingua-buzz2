@@ -219,7 +219,10 @@ export default function MemeSoundPage() {
 
     return () => {
       stopAllAudioSources();
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== 'closed'
+      ) {
         audioContextRef.current.close();
       }
     };
@@ -249,20 +252,26 @@ export default function MemeSoundPage() {
   const preloadAudioBuffer = async (url) => {
     try {
       if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        audioContextRef.current = new (window.AudioContext ||
+          window.webkitAudioContext)();
         console.log('Created new AudioContext');
       }
 
       console.log('Fetching audio buffer...');
       const response = await fetch(url);
       console.log('Audio fetch complete, decoding...');
-      
+
       const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
-      
+      const audioBuffer = await audioContextRef.current.decodeAudioData(
+        arrayBuffer
+      );
+
       if (audioBuffer) {
         audioBufferRef.current = audioBuffer;
-        console.log('Audio buffer loaded successfully, duration:', audioBuffer.duration);
+        console.log(
+          'Audio buffer loaded successfully, duration:',
+          audioBuffer.duration
+        );
       } else {
         console.error('Audio buffer appears empty');
       }
@@ -312,7 +321,9 @@ export default function MemeSoundPage() {
   // Fetch sound details
   const fetchSoundDetails = async (retryCount = 0) => {
     if (!soundId && !soundName && !decodedName) {
-      setError('Sound information required. Please select a sound from the main page.');
+      setError(
+        'Sound information required. Please select a sound from the main page.'
+      );
       setLoading(false);
       return;
     }
@@ -485,7 +496,7 @@ export default function MemeSoundPage() {
         }
       });
       audioSourcesRef.current = [];
-      
+
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
@@ -504,8 +515,12 @@ export default function MemeSoundPage() {
 
     try {
       // Ensure AudioContext is ready
-      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      if (
+        !audioContextRef.current ||
+        audioContextRef.current.state === 'closed'
+      ) {
+        audioContextRef.current = new (window.AudioContext ||
+          window.webkitAudioContext)();
         await preloadAudioBuffer(sound.audio_url);
       }
 
@@ -514,18 +529,20 @@ export default function MemeSoundPage() {
           await audioContextRef.current.resume();
         } catch (err) {
           console.error('Failed to resume AudioContext:', err);
-          throw new Error('Could not activate audio playback. Please try clicking play again.');
+          throw new Error(
+            'Could not activate audio playback. Please try clicking play again.'
+          );
         }
       }
 
       // Use simpler approach for mobile with high echo counts
       const useSimplifiedApproach = isMobileDevice() && echoCount > 2;
-      
+
       // Create gain node
       gainNodeRef.current = audioContextRef.current.createGain();
       gainNodeRef.current.gain.value = isMuted ? 0 : volume;
       gainNodeRef.current.connect(audioContextRef.current.destination);
-      
+
       // Clear existing sources
       stopAllAudioSources();
 
@@ -535,26 +552,26 @@ export default function MemeSoundPage() {
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBufferRef.current;
         source.playbackRate.value = playbackRate;
-        
+
         // Create delay to simulate echo
         const delay = audioContextRef.current.createDelay(2.0);
-        delay.delayTime.value = 0.1 * echoCount; 
-        
+        delay.delayTime.value = 0.1 * echoCount;
+
         // Create feedback for echo
         const feedback = audioContextRef.current.createGain();
-        feedback.gain.value = 0.3; 
-        
+        feedback.gain.value = 0.3;
+
         // Connect the nodes to create feedback loop
         source.connect(gainNodeRef.current);
         source.connect(delay);
         delay.connect(feedback);
         feedback.connect(delay);
         delay.connect(gainNodeRef.current);
-        
+
         source.loop = isLooping;
         source.start(0);
         audioSourcesRef.current.push(source);
-        
+
         source.onended = () => {
           if (!isLooping && playbackStateRef.current) {
             setIsPlaying(false);
@@ -563,10 +580,10 @@ export default function MemeSoundPage() {
             stopTimer();
           }
         };
-        
+
         return;
       }
-      
+
       // Regular approach for desktop or simple mobile cases
       let instanceCount;
       if (isMobileDevice()) {
@@ -576,23 +593,27 @@ export default function MemeSoundPage() {
         instanceCount = echoCount === 0 ? 1 : echoCount * 4;
         instanceCount = Math.min(instanceCount, 20);
       }
-      
-      console.log(`Playing with ${instanceCount} instances on ${isMobileDevice() ? 'mobile' : 'desktop'}`);
-      
+
+      console.log(
+        `Playing with ${instanceCount} instances on ${
+          isMobileDevice() ? 'mobile' : 'desktop'
+        }`
+      );
+
       for (let i = 0; i < instanceCount; i++) {
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBufferRef.current;
         source.playbackRate.value = playbackRate;
-        
+
         // Set pan and detune
         let pan = 0;
         let detune = 0;
-        
+
         if (i > 0) {
           pan = Math.sin((i / instanceCount) * Math.PI * 2) * 0.8;
           detune = (i / instanceCount) * 100 - 50;
         }
-        
+
         // Create panner with fallback
         let panner;
         try {
@@ -602,23 +623,23 @@ export default function MemeSoundPage() {
           console.log('StereoPanner not supported, using fallback');
           panner = audioContextRef.current.createGain();
         }
-        
+
         // Set detune
         source.detune.value = detune;
-        
+
         // Connect nodes
         source.connect(panner);
         panner.connect(gainNodeRef.current);
-        
+
         // Set loop
         source.loop = isLooping;
-        
+
         // Start playback
         source.start(0);
-        
+
         // Save reference
         audioSourcesRef.current.push(source);
-        
+
         // Add onended handler
         if (i === 0) {
           source.onended = () => {
@@ -634,7 +655,7 @@ export default function MemeSoundPage() {
     } catch (err) {
       console.error('Error playing with echo:', err);
       setError('Could not play audio with echo effect: ' + err.message);
-      
+
       // Fallback to standard audio
       if (audioRef.current) {
         try {
@@ -649,39 +670,42 @@ export default function MemeSoundPage() {
   // Toggle play/pause
   const togglePlay = async () => {
     const playButton = document.querySelector('[data-play-button]');
-    
+
     if (playButton) {
       playButton.disabled = true;
       setTimeout(() => {
         if (playButton) playButton.disabled = false;
       }, 500);
     }
-    
+
     try {
       if (isPlaying) {
         // STOP PLAYBACK
         console.log('Stopping playback');
         setIsPlaying(false);
         playbackStateRef.current = false;
-        
+
         stopAllAudioSources();
         stopTimer();
       } else {
         // START PLAYBACK
         console.log('Starting playback');
-        
+
         // Ensure context is ready
-        if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        if (
+          audioContextRef.current &&
+          audioContextRef.current.state === 'suspended'
+        ) {
           try {
             await audioContextRef.current.resume();
           } catch (err) {
             console.error('Failed to resume AudioContext:', err);
           }
         }
-        
+
         // Reset any error state
         setError(null);
-        
+
         // Start playback
         await handlePlay();
         startTimer();
@@ -726,7 +750,7 @@ export default function MemeSoundPage() {
   const handleVolumeChange = (e) => {
     const value = parseFloat(e.target.value);
     setVolume(value);
-    
+
     if (audioRef.current) {
       audioRef.current.volume = value;
       if (value === 0 && !isMuted) {
@@ -786,7 +810,7 @@ export default function MemeSoundPage() {
     if (isPlaying && !isConfigLocked) {
       const restartPlayback = async () => {
         stopAllAudioSources();
-        
+
         // Small delay to ensure everything stops properly
         await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -865,66 +889,77 @@ export default function MemeSoundPage() {
   return (
     <div className='min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 p-6'>
       <Helmet>
-        {sound && (() => {
-          const soundMetadata = {
-            id: sound.id,
-            name: sound.name,
-            length: sound.length || 3,
-            viralityIndex: sound.virality_index,
-            hashtags: sound.hastags || [],
-            year: new Date().getFullYear().toString(),
-          };
+        {sound &&
+          (() => {
+            const soundMetadata = {
+              id: sound.id,
+              name: sound.name,
+              length: sound.length || 3,
+              viralityIndex: sound.virality_index,
+              hashtags: sound.hastags || [],
+              year: new Date().getFullYear().toString(),
+            };
 
-          const metaTags = generateMetaTags(soundMetadata, currentLanguage);
+            const metaTags = generateMetaTags(soundMetadata, currentLanguage);
 
-          return (
-            <>
-              <title>{metaTags.title}</title>
-              <meta name='description' content={metaTags.description} />
-              <meta name='keywords' content={metaTags.keywords} />
-              <meta property='og:title' content={metaTags.ogTitle} />
-              <meta property='og:description' content={metaTags.ogDescription} />
-              <meta property='og:image' content={sound.image_url} />
-              <meta property='og:locale' content={metaTags.locale} />
-              <meta name='twitter:card' content='summary_large_image' />
-              <meta name='twitter:title' content={metaTags.twitterTitle} />
-              <meta name='twitter:description' content={metaTags.twitterDescription} />
-              <meta name='twitter:image' content={sound.image_url} />
-              
-              {sound.hastags?.map((tag) => (
-                <meta key={tag} property='article:tag' content={tag} />
-              ))}
-              
-              <link
-                rel='canonical'
-                href={`https://brainrot-memes.com/${currentLanguage.toLowerCase()}/memesound/${sound.id}`}
-              />
-              
-              {generateHreflangTags(soundMetadata).map(({ hreflang, href }) => (
-                <link
-                  key={hreflang}
-                  rel='alternate'
-                  hreflang={hreflang}
-                  href={href}
+            return (
+              <>
+                <title>{metaTags.title}</title>
+                <meta name='description' content={metaTags.description} />
+                <meta name='keywords' content={metaTags.keywords} />
+                <meta property='og:title' content={metaTags.ogTitle} />
+                <meta
+                  property='og:description'
+                  content={metaTags.ogDescription}
                 />
-              ))}
-              
-              <link
-                rel='alternate'
-                hreflang='x-default'
-                href={`https://brainrot-memes.com/english/memesound/${sound.id}`}
-              />
-              
-              <script type='application/ld+json'>
-                {JSON.stringify(
-                  generateSoundStructuredData(soundMetadata, currentLanguage)
+                <meta property='og:image' content={sound.image_url} />
+                <meta property='og:locale' content={metaTags.locale} />
+                <meta name='twitter:card' content='summary_large_image' />
+                <meta name='twitter:title' content={metaTags.twitterTitle} />
+                <meta
+                  name='twitter:description'
+                  content={metaTags.twitterDescription}
+                />
+                <meta name='twitter:image' content={sound.image_url} />
+
+                {sound.hastags?.map((tag) => (
+                  <meta key={tag} property='article:tag' content={tag} />
+                ))}
+
+                <link
+                  rel='canonical'
+                  href={`https://brainrot-memes.com/${currentLanguage.toLowerCase()}/memesound/${
+                    sound.id
+                  }`}
+                />
+
+                {generateHreflangTags(soundMetadata).map(
+                  ({ hreflang, href }) => (
+                    <link
+                      key={hreflang}
+                      rel='alternate'
+                      hreflang={hreflang}
+                      href={href}
+                    />
+                  )
                 )}
-              </script>
-            </>
-          );
-        })()}
+
+                <link
+                  rel='alternate'
+                  hreflang='x-default'
+                  href={`https://brainrot-memes.com/english/memesound/${sound.id}`}
+                />
+
+                <script type='application/ld+json'>
+                  {JSON.stringify(
+                    generateSoundStructuredData(soundMetadata, currentLanguage)
+                  )}
+                </script>
+              </>
+            );
+          })()}
       </Helmet>
-      
+
       <audio
         ref={audioRef}
         onEnded={() => {
@@ -965,9 +1000,16 @@ export default function MemeSoundPage() {
         <Card className='overflow-hidden bg-white/70 backdrop-blur-sm'>
           <div className='relative'>
             <img
-              src={sound.image_url}
+              src={generateSmallImageUrl(sound.image_url)}
+              srcSet={`${generateSmallImageUrl(
+                sound.image_url
+              )} 400w, ${generateMediumImageUrl(sound.image_url)} 800w, ${
+                sound.image_url
+              } 1200w`}
+              sizes='(max-width: 480px) 95vw, (max-width: 768px) 85vw, 100%'
+              loading='lazy'
               alt={sound.name}
-              className='w-full h-[400px] object-fill'
+              className='w-full h-[400px] object-cover sm:object-fill'
             />
 
             <div className='absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' />
@@ -1178,7 +1220,7 @@ export default function MemeSoundPage() {
                   Voice changed audio ready! Press Play to hear it.
                 </div>
               )}
-              
+
               {error && (
                 <div className='bg-red-50 p-3 rounded-md text-red-700 text-sm flex items-center'>
                   <AlertCircle className='w-4 h-4 mr-2' />

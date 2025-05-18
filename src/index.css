@@ -155,4 +155,37 @@ button:focus-visible {
   body {
     @apply bg-background text-foreground;
   }
+    html {
+    font-display: swap; /* Ensures text remains visible during font loading */
+  }
+  
+  @media (max-width: 640px) {
+    html {
+      font-size: 14px; /* Slightly smaller base font for mobile */
+    }
+  }
+}
+
+@layer components {
+  /* Mobile form optimizations */
+  @media (max-width: 640px) {
+    input[type="text"], 
+    input[type="search"],
+    input[type="email"],
+    input[type="password"],
+    select {
+      height: 44px !important; /* Easier tapping */
+      font-size: 16px !important; /* Prevents zoom */
+      padding-left: 12px !important;
+      padding-right: 12px !important;
+    }
+  }
+}
+
+@layer utilities {
+  .h-mobile-screen {
+    height: 100vh; /* fallback */
+    height: -webkit-fill-available;
+    height: stretch; /* modern browsers */
+  }
 }

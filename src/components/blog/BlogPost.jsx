@@ -55,13 +55,16 @@ export default function BlogPost() {
           <h1 className="text-3xl md:text-4xl font-bold mb-3">{post.title}</h1>
           <p className="text-purple-600 mb-8">{post.date}</p>
           
-          {post.image && (
-            <img 
-              src={post.image} 
-              alt={post.title}
-              className="w-full h-auto rounded-lg mb-8 max-h-[400px] object-cover"
-            />
-          )}
+{post.image && (
+  <img 
+    src={generateSmallImageUrl(post.image)}
+    srcSet={`${generateSmallImageUrl(post.image)} 400w, ${generateMediumImageUrl(post.image)} 800w, ${post.image} 1200w`}
+    sizes="(max-width: 480px) 95vw, (max-width: 768px) 70vw, 50vw"
+    loading="lazy"
+    alt={post.title}
+    className="w-full h-auto rounded-lg mb-8 max-h-[400px] object-cover"
+  />
+)}
           
           <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
           
