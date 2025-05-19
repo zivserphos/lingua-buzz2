@@ -6,6 +6,8 @@ import SavedSounds from './SavedSounds';
 import PolicyPage from './Policy';
 import BlogList from '../components/blog/BlogList.jsx';
 import BlogPost from '../components/blog/BlogPost.jsx';
+import { brainrotYoutubeUrls } from '@/components/randombrainrot/brainrotUrls.js';
+import RandomBrainrot from './RandomBrainrot';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import {
   BrowserRouter as Router,
@@ -44,6 +46,7 @@ const PAGES = {
   MemeSound: MemeSound,
   SavedSounds: SavedSounds,
   Blog: BlogList,
+  RandomBrainrot: RandomBrainrot,
 };
 
 /**
@@ -59,7 +62,7 @@ function LanguageRedirectWithParam({ paramName, redirectPath }) {
     const paramValue = params[paramName];
     
     // Special case for non-language specific routes
-    if (redirectPath === 'blog' || redirectPath === 'leaderboard' || redirectPath === 'savedsounds') {
+    if (redirectPath === 'blog' || redirectPath === 'leaderboard' || redirectPath === 'savedsounds'  || redirectPath === 'randombrainrot') {
       navigate(`/${redirectPath}/${paramValue}${location.search}`);
       return;
     }
@@ -88,7 +91,7 @@ function _getCurrentPage(url) {
   const parts = url.split('/').filter((part) => part);
 
   // Special handling for non-language specific routes
-  if (['blog', 'leaderboard', 'savedsounds'].includes(parts[0])) {
+  if (['blog', 'leaderboard', 'savedsounds' , 'randombrainrot'].includes(parts[0])) {
     return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
   }
   
@@ -126,7 +129,7 @@ function LanguageRedirect({ pathSuffix = '' }) {
     console.log(`LanguageRedirect: Redirecting with language ${userLanguage}`);
 
     // Special case for non-language specific routes
-    if (['blog', 'leaderboard', 'savedsounds'].includes(pathSuffix)) {
+    if (['blog', 'leaderboard', 'savedsounds', 'randombrainrot'].includes(pathSuffix)) {
       navigate(`/${pathSuffix}${location.search}`);
       return;
     }
@@ -185,6 +188,8 @@ function PagesContent() {
         <Route path='/savedsounds' element={<SavedSounds />} />
         <Route path='/blog' element={<BlogList />} />
         <Route path='/blog/:slug' element={<BlogPost />} />
+        <Route path='/randombrainrot' element={<RandomBrainrot />} /> {/* Add this line */}
+
 
         {/* Legacy route redirects */}
         <Route path='/sounds' element={<LanguageRedirect pathSuffix='sounds' />} />
@@ -192,6 +197,8 @@ function PagesContent() {
         <Route path='/memesound/:sound_id' element={
           <LanguageRedirectWithParam paramName='sound_id' redirectPath='memesound' />
         } />
+        <Route path='/:language/randombrainrot' element={<Navigate to="/randombrainrot" replace />} /> {/* Add this line */}
+
 
         {/* Policy pages */}
         <Route path='/privacy-policy' element={<PolicyPage />} />
