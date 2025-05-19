@@ -119,6 +119,7 @@ export default function MemeSoundPage() {
   const audioBufferRef = useRef(null);
   const gainNodeRef = useRef(null);
   const playbackStateRef = useRef(false); // Track playback state in a ref too
+  const lastLoadedAudioUrlRef = useRef(null);
 
   // Utility functions
   const isMobileDevice = () => {
@@ -164,6 +165,13 @@ export default function MemeSoundPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (voiceChangedAudioUrl) {
+      // When voice changes, preload the new audio buffer
+      preloadAudioBuffer(voiceChangedAudioUrl);
+    }
+  }, [voiceChangedAudioUrl]);
 
   // Clean up session on unmount
   useEffect(() => {
@@ -267,14 +275,18 @@ export default function MemeSoundPage() {
   // Preload audio buffer for Web Audio API
   const preloadAudioBuffer = async (url) => {
     try {
+      // Use the provided URL or fall back to the sound's audio_url
+      const audioUrl = url || sound?.audio_url;
+      if (!audioUrl) return;
+
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext ||
           window.webkitAudioContext)();
         console.log('Created new AudioContext');
       }
 
-      console.log('Fetching audio buffer...');
-      const response = await fetch(url);
+      console.log('Fetching audio buffer from:', audioUrl);
+      const response = await fetch(audioUrl);
       console.log('Audio fetch complete, decoding...');
 
       const arrayBuffer = await response.arrayBuffer();
@@ -284,6 +296,7 @@ export default function MemeSoundPage() {
 
       if (audioBuffer) {
         audioBufferRef.current = audioBuffer;
+        lastLoadedAudioUrlRef.current = audioUrl;
         console.log(
           'Audio buffer loaded successfully, duration:',
           audioBuffer.duration
@@ -524,8 +537,22 @@ export default function MemeSoundPage() {
 
   // Play with Web Audio API and echo effect
   const playWithEcho = async () => {
-    if (!sound?.audio_url || !audioBufferRef.current) {
+    const activeAudioUrl = voiceChangedAudioUrl || sound?.audio_url;
+    if (!activeAudioUrl || !audioBufferRef.current) {
       console.error('Audio not available or not loaded');
+      return;
+    }
+
+    // Make sure we're using the right audio buffer
+    if (
+      (voiceChangedAudioUrl && !audioBufferRef.current) ||
+      (voiceChangedAudioUrl &&
+        voiceChangedAudioUrl !== lastLoadedAudioUrlRef.current)
+    ) {
+      await preloadAudioBuffer(voiceChangedAudioUrl);
+    }
+    if (!audioBufferRef.current) {
+      console.error('Audio buffer not loaded');
       return;
     }
 
