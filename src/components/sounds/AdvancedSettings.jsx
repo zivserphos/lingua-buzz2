@@ -35,7 +35,7 @@ export default function AdvancedSettings({
         <div className="bg-gray-50 rounded-lg p-4 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">
-              Echo Effect ({echoCount === 0 ? 'Off' : `${echoCount * 4} instances`})
+              Echo Effect ({echoCount === 0 ? 'Off' : `${echoCount + 1} instances`})
             </label>
             <Button
               size="sm"

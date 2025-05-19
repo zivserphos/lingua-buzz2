@@ -248,6 +248,22 @@ export default function MemeSoundPage() {
     }
   }, [volume, isMuted]);
 
+  const generateSmallImageUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('firebasestorage.googleapis.com')) {
+      return url.replace('alt=media', 'alt=media&w=400');
+    }
+    return url;
+  };
+
+  const generateMediumImageUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('firebasestorage.googleapis.com')) {
+      return url.replace('alt=media', 'alt=media&w=800');
+    }
+    return url;
+  };
+
   // Preload audio buffer for Web Audio API
   const preloadAudioBuffer = async (url) => {
     try {
@@ -586,13 +602,16 @@ export default function MemeSoundPage() {
 
       // Regular approach for desktop or simple mobile cases
       let instanceCount;
-      if (isMobileDevice()) {
-        instanceCount = echoCount === 0 ? 1 : echoCount;
-        instanceCount = Math.min(instanceCount, 5);
+      if (echoCount === 0) {
+        instanceCount = 1; // No echo, just the original sound
       } else {
-        instanceCount = echoCount === 0 ? 1 : echoCount * 4;
-        instanceCount = Math.min(instanceCount, 20);
+        instanceCount = echoCount + 1; // Echo level plus the original sound
       }
+      instanceCount = Math.min(instanceCount, 6); // Maximum 6 instances (original + 5 echoes)
+
+      console.log(
+        `Playing with ${instanceCount} instances (echo level: ${echoCount})`
+      );
 
       console.log(
         `Playing with ${instanceCount} instances on ${
