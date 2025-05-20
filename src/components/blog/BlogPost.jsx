@@ -10,6 +10,23 @@ export default function BlogPost() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
+
+    const generateSmallImageUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('firebasestorage.googleapis.com')) {
+      return url.replace('alt=media', 'alt=media&w=400');
+    }
+    return url;
+  };
+
+    const generateMediumImageUrl = (url) => {
+    if (!url) return '';
+    if (url.includes('firebasestorage.googleapis.com')) {
+      return url.replace('alt=media', 'alt=media&w=800');
+    }
+    return url;
+  };
+
   
   useEffect(() => {
     const foundPost = blogPosts.find((p) => p.slug === slug);

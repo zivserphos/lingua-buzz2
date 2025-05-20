@@ -16,14 +16,6 @@ import { fetchSoundLeaderboard } from '@/components/services/LeaderboardService'
 import LeaderboardModal from './LeaderboardModal';
 import SocialService from '@/components/services/SocialService';
 
-// Helper function to replace the import
-const generateSmallImageUrl = (url) => {
-  if (!url) return '';
-  if (url.includes('firebasestorage.googleapis.com')) {
-    return url.replace('alt=media', 'alt=media&w=400');
-  }
-  return url;
-};
 
 export default function SoundCard({
   sound,
@@ -152,17 +144,16 @@ export default function SoundCard({
       <Card className='overflow-hidden bg-white/70 backdrop-blur-sm hover:bg-white/90 transition-all duration-300'>
         <CardContent className='p-0'>
           {/* Image section with shorter height on desktop */}
-          <div className='relative h-40 overflow-hidden'>
+          <div className='relative'>
             <img
-              src={generateSmallImageUrl(sound.image_url)}
+              src={sound.image_url}
               alt={sound.name}
-              loading='lazy'
-              className={`w-full h-full ${
+              className={`w-full h-48 ${
                 isSquareImage ? 'object-fill' : 'object-cover'
               } transition-transform duration-300 group-hover:scale-105`}
             />
             <div className='absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300'></div>
-            
+
             {/* "Go Crazy" button - visible on hover */}
             <div className='absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0'>
               <Link

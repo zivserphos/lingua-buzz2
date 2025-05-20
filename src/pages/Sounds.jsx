@@ -219,7 +219,7 @@ export default function SoundsPage() {
 
       {/* <BottomFixedAd /> */}
 
-      <div className='max-w-[1600px] mx-auto px-3 sm:px-4 py-4 sm:py-8'>
+      <div className='max-w-[1600px] mx-auto px-4 py-8'>
         <AuthBanner
           id='auth-banner'
           show={showAuthBanner}
@@ -228,55 +228,52 @@ export default function SoundsPage() {
           onClose={() => setShowAuthBanner(false)}
         />
 
-      <Header
-        user={user}
-        isAnonymousGuest={isAnonymousGuest}
-        authLoading={authLoading}
-        onGuestClick={handleGuestDialogOpen}
-        onSignInClick={handleGoogleSignIn}
-        onSignOutClick={handleSignOut}
-      />
-
-      <SearchControls
-        searchTerm={searchTerm}
-        language={language}
-        onSearchChange={handleSearchInput}
-        onLanguageChange={handleLanguageChange}
-        onSearch={handleExplicitSearch}
-      />
-
-      {error && (
-        <ErrorMessage
-          error={error}
-          onRetry={() => fetchSounds({ reset: true })}
+        <Header
+          user={user}
+          isAnonymousGuest={isAnonymousGuest}
+          authLoading={authLoading}
+          onGuestClick={handleGuestDialogOpen}
+          onSignInClick={handleGoogleSignIn}
+          onSignOutClick={handleSignOut}
         />
-      )}
 
-      {initialLoading ? (
-        <div className='flex flex-col justify-center items-center min-h-[300px]'>
-          <Loader2 className='w-8 h-8 sm:w-10 sm:h-10 animate-spin text-purple-600 mb-4' />
-          <p className='text-sm text-gray-500 mb-2'>Loading sounds...</p>
-          <Button
-            onClick={() => fetchSounds({ reset: true })}
-            variant='outline'
-            size='sm'
-            className='mt-4'
-          >
-            Reset Loading
-          </Button>
-        </div>
-      ) : (
-        <div className='relative'>
-          {/* Left side ad - visible only on XL screens */}
-          <div
-            className='hidden xl:block fixed left-0 top-1/2 transform -translate-y-1/2 ml-4'
-            style={{ width: '160px', zIndex: 40 }}
-          >
-            <LeftSideAd />
+        <SearchControls
+          searchTerm={searchTerm}
+          language={language}
+          onSearchChange={handleSearchInput}
+          onLanguageChange={handleLanguageChange}
+          onSearch={handleExplicitSearch}
+        />
+
+        {error && (
+          <ErrorMessage
+            error={error}
+            onRetry={() => fetchSounds({ reset: true })}
+          />
+        )}
+
+        {initialLoading ? (
+          <div className='flex flex-col justify-center items-center min-h-[300px]'>
+            <Loader2 className='w-10 h-10 animate-spin text-purple-600 mb-4' />
+            <p className='text-sm text-gray-500 mb-2'>Loading sounds...</p>
+            <Button
+              onClick={() => fetchSounds({ reset: true })}
+              variant='outline'
+              size='sm'
+              className='mt-4'
+            >
+              Reset Loading
+            </Button>
           </div>
+        ) : (
+          <div className='flex'>
+            <div
+              className='hidden xl:block fixed left-0 top-1/2 transform -translate-y-1/2 ml-4'
+              style={{ width: '160px', zIndex: 40 }}
+            >
+              <LeftSideAd />
+            </div>
 
-          {/* Main content - centered on all devices */}
-          <div className="mx-auto px-0 sm:px-4 md:px-6">
             <SoundGrid
               sounds={sounds}
               loading={loading}
@@ -290,31 +287,29 @@ export default function SoundsPage() {
               onLoadMore={handleLoadMore}
               language={language}
             />
+
+            <div
+              className='hidden xl:block fixed right-0 top-1/2 transform -translate-y-1/2 mr-4'
+              style={{ width: '160px', zIndex: 40 }}
+            >
+              <RightSideAd />
+            </div>
           </div>
+        )}
+      </div>
 
-          {/* Right side ad - visible only on XL screens */}
-          <div
-            className='hidden xl:block fixed right-0 top-1/2 transform -translate-y-1/2 mr-4'
-            style={{ width: '160px', zIndex: 40 }}
-          >
-            <RightSideAd />
-          </div>
-        </div>
-      )}
-    </div>
+      <GuestDialog
+        open={showGuestDialog}
+        isAnonymousGuest={isAnonymousGuest}
+        username={guestUsername}
+        onOpenChange={setShowGuestDialog}
+        onUsernameChange={(e) => setGuestUsername(e.target.value)}
+        onSubmit={handleGuestSignIn}
+        interactionSource={interactionSource}
+        onGoogleSignIn={handleGoogleSignIn}
+      />
 
-    <GuestDialog
-      open={showGuestDialog}
-      isAnonymousGuest={isAnonymousGuest}
-      username={guestUsername}
-      onOpenChange={setShowGuestDialog}
-      onUsernameChange={(e) => setGuestUsername(e.target.value)}
-      onSubmit={handleGuestSignIn}
-      interactionSource={interactionSource}
-      onGoogleSignIn={handleGoogleSignIn}
-    />
-
-    <style>{`
+      <style>{`
       .ad-container {
         min-height: 250px;
         background-color: rgba(255, 255, 255, 0.5);
