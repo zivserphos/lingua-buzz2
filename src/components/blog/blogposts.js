@@ -1217,40 +1217,6 @@ export const blogPosts = [
     `,
   },
   {
-    slug: 'accessibility-in-sound-memes',
-    title: 'Silent Memes: Making Audio Culture Accessible to Everyone',
-    date: 'January 18, 2022',
-    excerpt:
-      'How creators are working to ensure deaf and hard-of-hearing people can participate in audio meme culture.',
-    image:
-      'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-    content: `
-      <p>As audio memes become increasingly central to internet culture, creators and platforms are finding innovative ways to make these experiences accessible to deaf and hard-of-hearing communities.</p>
-      
-      <h2>Beyond Simple Captioning</h2>
-      <p>While basic captioning was once the standard, creators are now developing more nuanced approaches to conveying audio experiences visually. Descriptive captioning that includes tone, volume, and emotional quality (e.g., [excited whisper] or [bass-boosted explosion]) helps convey the full audio experience.</p>
-      
-      <h2>Visual Sound Representation</h2>
-      <p>Some creators use visual sound representation—graphic waveforms, animations that respond to audio, or color sequences—to represent sound characteristics. These visual accompaniments help deaf viewers understand the rhythmic and tonal qualities of audio memes.</p>
-      
-      <h2>Vibration and Haptic Feedback</h2>
-      <p>Emerging technologies are translating audio memes into haptic experiences. Apps like "Audio to Vibration" convert sound frequencies into specific vibration patterns, allowing users to literally feel viral sounds through their devices.</p>
-      
-      <h2>Sign Language Memes</h2>
-      <p>A growing community of creators is developing sign language interpretations of famous audio memes, sometimes adding creative visual flourishes that capture the essence of the original sound. These signed versions often develop their own creative extensions and variations.</p>
-      
-      <h2>Platform Responsibilities</h2>
-      <p>Major platforms are gradually improving their accessibility features:</p>
-      <ul>
-        <li>TikTok's text-to-speech features help creators add narration to visuals</li>
-        <li>Instagram has expanded automatic captioning capabilities</li>
-        <li>YouTube's machine-generated captions continue to improve in accuracy</li>
-      </ul>
-      
-      <p>The most successful approaches recognize that accessibility isn't just about technical accommodation—it's about ensuring that everyone can participate fully in shared cultural experiences, including the joy and community of audio meme culture.</p>
-    `,
-  },
-  {
     slug: 'voice-effects-in-meme-creation',
     title: 'Voice Effect Masterclass: Creating Distinctive Audio Memes',
     date: 'December 10, 2021',
