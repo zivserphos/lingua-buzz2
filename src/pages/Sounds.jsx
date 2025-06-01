@@ -92,6 +92,9 @@ export default function SoundsPage() {
       portuguese: `Sons Engraçados de Memes e Efeitos de Áudio | Baixe ${
         searchTerm ? `${searchTerm} ` : ''
       }Grátis`,
+      brazil: `Sons Virais | Memes Engraçados e Efeitos Sonoros Para WhatsApp | Baixe ${
+        searchTerm ? `${searchTerm} ` : ''
+      }Grátis`,
       german: `Lustige Meme-Sounds & Audio-Effekte | Kostenlose ${
         searchTerm ? `${searchTerm} ` : ''
       }Soundeffekte`,
@@ -132,6 +135,7 @@ export default function SoundsPage() {
       english: `Browse and download ${emotion} meme sounds, audio effects and clips. Perfect for TikTok, Reels, and YouTube Shorts. Create viral content with our ${trendTerm} sound collection.`,
       spanish: `Explora y descarga sonidos ${emotion} de memes, efectos de audio y clips. Perfectos para TikTok, Reels y YouTube Shorts. Crea contenido viral con nuestra colección de sonidos ${trendTerm}.`,
       portuguese: `Navegue e baixe sons ${emotion} de memes, efeitos de áudio e clipes. Perfeitos para TikTok, Reels e YouTube Shorts. Crie conteúdo viral com nossa coleção de sons ${trendTerm}.`,
+        brazil: `Navegue e baixe sons ${emotion} de memes para WhatsApp, efeitos sonoros e áudios engraçados. Perfeitos para status, stories e vídeos curtos. Crie conteúdo viral com nossa coleção de sons ${trendTerm}.`,
       // Add other languages similarly...
     };
 

@@ -21,7 +21,7 @@ export default function SoundCard({
   sound,
   isAnonymousGuest,
   onInteraction,
-  language,
+  language = 'english',
 }) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [isLiked, setIsLiked] = useState(sound?.isLiked || false);

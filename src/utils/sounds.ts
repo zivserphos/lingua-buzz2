@@ -95,6 +95,7 @@ function getLanguageSpecificDescription(
     english: `Listen to and download "${soundName}" - the ${emotion} ${category || 'meme'} sound that's trending right now. Perfect for TikTok, Instagram Reels, YouTube Shorts and other social media content.`,
     spanish: `Escucha y descarga "${soundName}" - el sonido de ${category || 'meme'} ${emotion} que está en tendencia ahora. Perfecto para TikTok, Instagram Reels, YouTube Shorts y otro contenido de redes sociales.`,
     portuguese: `Ouça e baixe "${soundName}" - o som ${emotion} de ${category || 'meme'} que está em alta agora. Perfeito para TikTok, Instagram Reels, YouTube Shorts e outro conteúdo de mídia social.`,
+    brazil: `Ouça e baixe "${soundName}" - o som ${emotion} de ${category || 'meme'} que está bombando agora. Perfeito para TikTok, Instagram Reels, YouTube Shorts e outros conteúdos nas redes sociais.`,
     german: `Höre und lade "${soundName}" herunter - den ${emotion} ${category || 'Meme'}-Sound, der gerade im Trend liegt. Perfekt für TikTok, Instagram Reels, YouTube Shorts und andere Social-Media-Inhalte.`,
     russian: `Слушайте и скачивайте "${soundName}" - ${emotion} звук ${category || 'мема'}, который сейчас в тренде. Идеально подходит для TikTok, Instagram Reels, YouTube Shorts и другого контента в социальных сетях.`,
     arabic: `استمع وقم بتنزيل "${soundName}" - صوت ${category || 'ميم'} ${emotion} الرائج الآن. مثالي لـ TikTok وInstagram Reels وYouTube Shorts ومحتوى وسائل التواصل الاجتماعي الأخرى.`,
@@ -145,7 +146,7 @@ function getRandomItem<T>(array: T[]): T {
 export function generateAlternateLanguageLinks(soundName: string): Record<string, string> {
   const encodedSoundName = encodeURIComponent(soundName.toLowerCase().replace(/\s+/g, '_'));
   const supportedLanguages = [
-    'english', 'spanish', 'portuguese', 'german', 'russian', 'arabic', 
+    'english', 'spanish','brazil' , 'portuguese', 'german', 'russian', 'arabic', 
     'japanese', 'korean', 'vietnamese', 'chinese', 'french', 'italian', 
     'turkish', 'hindi', 'hebrew'
   ];

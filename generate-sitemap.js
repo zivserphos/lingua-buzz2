@@ -14,6 +14,7 @@ const BASE_URL = 'https://brainrot-memes.com';
 const SUPPORTED_LANGUAGES = [
   'English',
   'Portuguese',
+  'Brazil',
   'Spanish',
   'German',
   'Russian',

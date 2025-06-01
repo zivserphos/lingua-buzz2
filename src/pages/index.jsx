@@ -22,7 +22,7 @@ import { useEffect } from 'react';
 
 export const SUPPORTED_LANGUAGES = [
   { code: 'English', flag: '🇬🇧' },
-  { code: 'Portuguese', flag: '🇵🇹' },
+  { code: 'Brazil', flag: '🇧🇷' },
   { code: 'Spanish', flag: '🇪🇸' },
   { code: 'German', flag: '🇩🇪' },
   { code: 'Russian', flag: '🇷🇺' },
@@ -36,6 +36,7 @@ export const SUPPORTED_LANGUAGES = [
   { code: 'Turkish', flag: '🇹🇷' },
   { code: 'Hindi', flag: '🇮🇳' },
   { code: 'Hebrew', flag: '🇮🇱' },
+  { code: 'Portuguese', flag: '🇵🇹' },
 ];
 
 export const DEFAULT_LANGUAGE = 'English';
